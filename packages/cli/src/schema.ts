@@ -115,11 +115,6 @@ export function agentVisibleProperties(
   });
 }
 
-/** Properties Siri may surface (internal ones are dropped; sensitive ones stay, behind authentication). */
-export function siriVisibleProperties(entity: Pick<Entity, "properties">): [string, EntityProperty][] {
-  return Object.entries(entity.properties).filter(([, prop]) => prop.visibility !== "internal");
-}
-
 function objectSchema(
   title: string | undefined,
   description: string | undefined,

@@ -18,14 +18,6 @@ export function lines(parts: (string | false | undefined | null)[]): string {
   return parts.filter((p) => p !== false && p !== undefined && p !== null).join("\n").replace(/\n*$/, "\n");
 }
 
-export function indent(text: string, spaces: number): string {
-  const pad = " ".repeat(spaces);
-  return text
-    .split("\n")
-    .map((l) => (l.length ? pad + l : l))
-    .join("\n");
-}
-
 export function lowerFirst(s: string): string {
   return s ? s[0].toLowerCase() + s.slice(1) : s;
 }

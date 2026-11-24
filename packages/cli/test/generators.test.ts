@@ -9,7 +9,7 @@ import { generateKotlin } from "../src/generators/kotlin.js";
 import { generateMcp } from "../src/generators/mcp.js";
 import { generateSwift } from "../src/generators/swift.js";
 import type { Manifest } from "../src/manifest.js";
-import { GENERATED_DIR, REPO, loadExample, paymentManifest, variant } from "./helpers.js";
+import { GENERATED_DIR, REPO, fieldNotesManifest, loadExample, optInManifest, paymentManifest, variant } from "./helpers.js";
 
 const IGNORED = new Set(["node_modules", ".wrangler", ".dev.vars"]);
 
@@ -196,11 +196,8 @@ describe("kotlin generator", () => {
       for (const [name, manifest] of [
         ["todo", loadExample()],
         ["coffee", paymentManifest()],
-        ["todo-optin", variant((m) => {
-          m.app.android = { packageName: "com.example.optin" };
-          m.actions[4].platforms = { android: { enabled: true } };
-          m.actions[5].platforms = { android: { enabled: true } };
-        })],
+        ["todo-optin", optInManifest()],
+        ["field-notes", fieldNotesManifest()],
       ] as [string, Manifest][]) {
         const target = join(out, name);
         writeFiles(target, generateKotlin(manifest));

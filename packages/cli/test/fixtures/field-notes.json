@@ -1,0 +1,461 @@
+{
+  "$schema": "../../../../schema/omnintent.schema.json",
+  "omnintent": "0.1",
+  "app": {
+    "name": "Field Notes",
+    "slug": "field-notes",
+    "description": "Records field readings with numbers, dates, links and tags. Used only to check that every parameter and result type compiles with the real AppFunctions compiler.",
+    "android": {
+      "packageName": "com.example.fieldnotes"
+    }
+  },
+  "backend": {
+    "baseUrl": "<YOUR_BACKEND_URL>",
+    "auth": {
+      "type": "none"
+    }
+  },
+  "entities": {
+    "Reading": {
+      "type": "object",
+      "title": "Reading",
+      "description": "One recorded field reading.",
+      "privacy": "personal",
+      "idProperty": "id",
+      "displayProperty": "label",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique ID of the reading."
+        },
+        "label": {
+          "type": "string",
+          "description": "A short label for the reading."
+        },
+        "count": {
+          "type": "integer",
+          "description": "How many samples were taken."
+        },
+        "serial": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The sensor's serial number."
+        },
+        "temperature": {
+          "type": "number",
+          "description": "The temperature in degrees Celsius."
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether someone checked the reading."
+        },
+        "day": {
+          "type": "string",
+          "format": "date",
+          "description": "The day of the reading."
+        },
+        "takenAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the reading was taken."
+        },
+        "photo": {
+          "type": "string",
+          "format": "uri",
+          "description": "A link to a photo of the site."
+        },
+        "quality": {
+          "type": "string",
+          "enum": [
+            "low",
+            "high"
+          ],
+          "description": "How reliable the reading is."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form tags."
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "The raw sample values."
+        },
+        "weights": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "The weight of each sample."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "description": "Per-sample validity flags."
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": "Related links."
+        },
+        "secret": {
+          "type": "string",
+          "description": "An access code for the site.",
+          "privacy": "sensitive"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "count"
+      ]
+    }
+  },
+  "actions": [
+    {
+      "name": "log_reading",
+      "title": "Log Reading",
+      "description": "Records a new field reading and returns a short receipt.",
+      "safety": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "A short label for the reading, for example \"north creek\".",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many samples were taken.",
+            "minimum": 1,
+            "title": "Count"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The most samples to keep. Defaults to 10.",
+            "default": 10,
+            "title": "Limit"
+          },
+          "serial": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The sensor's serial number.",
+            "default": 42,
+            "title": "Serial"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "The temperature in degrees Celsius.",
+            "default": 20,
+            "title": "Temperature"
+          },
+          "humidity": {
+            "type": "number",
+            "description": "The relative humidity, from 0 to 1.",
+            "title": "Humidity"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether someone checked the reading.",
+            "default": false,
+            "title": "Verified"
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether the reading needs attention today.",
+            "title": "Urgent"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "description": "The day of the reading, as YYYY-MM-DD.",
+            "title": "Day"
+          },
+          "takenAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the reading was taken.",
+            "title": "TakenAt"
+          },
+          "photo": {
+            "type": "string",
+            "format": "uri",
+            "description": "A link to a photo of the site.",
+            "title": "Photo"
+          },
+          "contact": {
+            "type": "string",
+            "format": "email",
+            "description": "Who to contact about the reading.",
+            "title": "Contact"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "low",
+              "high"
+            ],
+            "description": "How reliable the reading is: low or high.",
+            "title": "Quality"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "metric",
+              "imperial"
+            ],
+            "description": "The unit system.",
+            "default": "metric",
+            "title": "Unit"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Free-form tags.",
+            "title": "Tags"
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "The raw sample values.",
+            "title": "Samples"
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Serial numbers of extra sensors.",
+            "title": "Serials"
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "The weight of each sample.",
+            "title": "Weights"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "description": "Per-sample validity flags.",
+            "title": "Flags"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Days the site was visited.",
+            "title": "Days"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Related links.",
+            "title": "Links"
+          }
+        },
+        "required": [
+          "label",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "A short receipt for the saved reading.",
+        "properties": {
+          "readingId": {
+            "type": "string",
+            "description": "The ID of the saved reading."
+          },
+          "savedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the reading was saved."
+          },
+          "total": {
+            "type": "integer",
+            "description": "How many readings exist now."
+          },
+          "ratio": {
+            "type": "number",
+            "description": "The share of valid samples."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether the reading passed checks."
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "description": "A link to the saved reading."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Problems found in the reading."
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Per-sample scores."
+          }
+        },
+        "required": [
+          "readingId",
+          "total"
+        ]
+      },
+      "backend": {
+        "method": "POST",
+        "path": "/readings"
+      },
+      "examples": [
+        {
+          "utterance": "Log 3 samples at north creek",
+          "arguments": {
+            "label": "north creek",
+            "count": 3
+          }
+        },
+        {
+          "utterance": "Record 5 high quality samples at the pond, 18.5 degrees",
+          "arguments": {
+            "label": "pond",
+            "count": 5,
+            "quality": "high",
+            "temperature": 18.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_reading",
+      "title": "Get Reading",
+      "description": "Finds one field reading by its ID.",
+      "safety": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "readingId": {
+            "type": "string",
+            "description": "The ID of the reading.",
+            "x-omnintent-entity": "Reading",
+            "title": "ReadingId"
+          }
+        },
+        "required": [
+          "readingId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/entities/Reading"
+      },
+      "backend": {
+        "method": "GET",
+        "path": "/readings/{readingId}"
+      },
+      "examples": [
+        {
+          "utterance": "Show reading r-1",
+          "arguments": {
+            "readingId": "r-1"
+          }
+        },
+        {
+          "utterance": "Open reading r-2",
+          "arguments": {
+            "readingId": "r-2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "list_readings",
+      "title": "List Readings",
+      "description": "Lists recent field readings, newest first.",
+      "safety": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/entities/Reading"
+        }
+      },
+      "backend": {
+        "method": "GET",
+        "path": "/readings"
+      },
+      "examples": [
+        {
+          "utterance": "What readings do I have?",
+          "arguments": {}
+        },
+        {
+          "utterance": "Show my latest readings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "name": "sync_now",
+      "title": "Sync Now",
+      "description": "Starts uploading unsent readings in the background.",
+      "safety": "write",
+      "idempotent": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "backend": {
+        "method": "POST",
+        "path": "/sync"
+      },
+      "examples": [
+        {
+          "utterance": "Sync my readings",
+          "arguments": {}
+        },
+        {
+          "utterance": "Upload my readings now",
+          "arguments": {}
+        }
+      ]
+    }
+  ]
+}

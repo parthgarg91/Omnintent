@@ -20,6 +20,9 @@ network policy.
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
 | Builder agent | 34 tests against a **fake** streaming Messages API and a **fake** GitHub API: request shape (`claude-opus-5-5`, adaptive thinking, effort `high`, structured output, `fallbacks: "default"`), SSE parsing (split chunks, fallback blocks, refusals, stream errors), proposal checks (paths, file types, coverage, missing methods), the repair loop, one draft pull request per platform, Git Data API call sequence, refusing writes outside its branch prefix, not rebuilding or reopening, stale-file removal, dry runs and the CLI | Pass. |
 | Builder agent on real GitHub | `omnintent build` against the public `parthgarg91/Omnintent` repository from this container | The read calls worked (branch lookup, base commit). Creating the branch was refused by this environment's proxy (403 on `POST /git/trees`), so no real pull request was opened. |
+| Watcher agent | 21 tests against a **fake** web: RESEARCH.md baselines are read from the real file, newer npm/AppFunctions/MCP versions are flagged, changed/added/removed page sections are named, unreadable sources keep their snapshot, the fingerprint is stable, and no real network is used | Pass. |
+| Watcher, live run | `omnintent watch` from this container on November 24, 2026: 18 of 20 sources read and matched `RESEARCH.md`; two runs in a row gave identical page hashes. The two Cloudflare docs pages are blocked by this container's network policy | 18 of 20 read. |
+| Submission helper | 13 tests: every draft file, internal-TestFlight-only wording, Apple's 4,000-byte App Review notes limit, Android exposure matching the safety table, MCP annotations and withheld fields, warnings, and that it works with `fetch` disabled | Pass. |
 | Discovery, AI path | Against a **fake** Messages API: request shape (URL, headers, `claude-opus-5-5`, `output_config.format`), conversion, the repair loop, giving up on persistent errors, and the CLI writing nothing when the draft stays invalid | Pass. |
 
 The 7 end-to-end checks run on each runtime:
@@ -32,7 +35,7 @@ The 7 end-to-end checks run on each runtime:
 6. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
 7. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 113 tests across 6 files (`npm test`; one is skipped when a tool is missing).
+Total: 147 tests across 8 files (`npm test`; one is skipped when a tool is missing).
 
 ## Not verified
 
@@ -118,6 +121,36 @@ Total: 113 tests across 6 files (`npm test`; one is skipped when a tool is missi
 - No shared agent runtime yet: the builder has its own small streaming client
   (`packages/cli/src/builder/claude.ts`). The tester, optimizer and watcher agents may want to
   share it.
+
+### Watcher agent
+
+- **The GitHub Actions workflow has not run yet.** It runs on a schedule only from the default
+  branch, so it first runs after this change is merged. Until then the issue step, the duplicate
+  check and the snapshot pull request are untested.
+- Opening the snapshot pull request needs the repository setting "Allow GitHub Actions to create and
+  approve pull requests". Without it the branch is pushed and the run shows a warning.
+- The Cloudflare docs pages were not reachable from this container, so they have no snapshot yet.
+  The first workflow run records one (reported as "first snapshot", which opens no issue).
+- Page checks are section hashes. Any edit, including a typo fix, counts as a change; the watcher
+  cannot tell an API change from a wording change. A person reads the source.
+- Version checks depend on regular expressions over `docs/RESEARCH.md`. Rewording a tracked fact
+  makes the watcher report "RESEARCH.md fact missing" until the pattern in `sources.ts` is updated.
+- Not watched: host connector requirements (Claude, ChatGPT, Gemini, Meta Muse), Google Connected
+  Console, Expo, and the Anthropic API. Their pages were either not readable or not stable enough
+  to diff.
+
+### Submission helper
+
+- Nothing was submitted anywhere, by design.
+- Checked on Apple's App Store Connect help page (November 24, 2026): App Review notes allow up to
+  4,000 bytes. **Not confirmed:** the 4,000-character limit used for TestFlight "What to Test"; the
+  page that should state it did not show it as text.
+- The Google Connected Console form was never seen. The Android draft lists the facts the console is
+  likely to ask for, not its field names.
+- The MCP listing's host notes repeat `RESEARCH.md`: only Gemini Spark and Meta Muse have (third-party)
+  sources; Claude and ChatGPT directory requirements were not checked.
+- Whether App Review can see `@AppIntent(.tool)` intents in the Shortcuts app, as the review notes
+  suggest, is unconfirmed.
 
 ### Cloud agent facts
 

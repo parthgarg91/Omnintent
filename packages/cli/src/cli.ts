@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { formatBuildReport, GitHubRest, loadBuilderConfig, runBuilder } from "./builder/index.js";
+import { AGENT_COMMANDS, AGENT_HELP, submitPrepCommand, watchCommand } from "./agents/commands.js";
 import { discover } from "./discover/index.js";
 import { generate, parseTargets, writeFiles } from "./generators/index.js";
 import { CLI_VERSION, type Manifest } from "./manifest.js";
@@ -21,7 +22,7 @@ Usage:
   omnintent test <omnintent.json> [--plan <dir>] [--json]
   omnintent build [--config omnintent.builder.json] [--since <git-ref>] [--platform swift,kotlin,mcp]
                   [--dry-run <dir>] [--no-ai] [--model <id>] [--json]
-
+${AGENT_HELP}
 Commands:
   validate  Check the manifest against the JSON Schema and the rule book.
   generate  Write Swift App Intents, Kotlin AppFunctions and/or an MCP server.
@@ -35,7 +36,7 @@ Commands:
             request per platform (GITHUB_TOKEN). Never merges or deploys.
             --since compares with the manifest at a git ref; --dry-run writes
             the planned branches to a folder instead of GitHub.
-`;
+${AGENT_COMMANDS}`;
 
 function fail(message: string): never {
   process.stderr.write(`omnintent: ${message}\n`);
@@ -71,8 +72,14 @@ async function main(argv: string[]): Promise<void> {
       force: { type: "boolean" },
       config: { type: "string" },
       since: { type: "string" },
-      platform: { type: "string" },
       "dry-run": { type: "string" },
+      research: { type: "string" },
+      state: { type: "string" },
+      "update-state": { type: "boolean" },
+      report: { type: "string" },
+      "report-json": { type: "string" },
+      only: { type: "string" },
+      platform: { type: "string" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -177,6 +184,16 @@ async function main(argv: string[]): Promise<void> {
       if (values.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
       else process.stdout.write(`${formatBuildReport(report)}\n`);
       if (report.platforms.some((p) => p.status === "failed")) process.exit(1);
+      return;
+    }
+    case "watch": {
+      await watchCommand(values);
+      return;
+    }
+    case "submit-prep": {
+      if (!input) fail("usage: omnintent submit-prep <omnintent.json> --out <dir>");
+      if (!values.out) fail("--out <dir> is required");
+      submitPrepCommand(loadValid(input, false), values.out, values.platform);
       return;
     }
     default:

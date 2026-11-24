@@ -127,9 +127,29 @@ export interface Skill {
   actions?: string[];
 }
 
+/**
+ * Per-user sign-in: the MCP server is an OAuth 2.1 authorization server for MCP
+ * clients, and signs each user in to the backend's own OAuth server to get that
+ * user's backend token (SPEC.md, section E.5).
+ */
+export interface BackendOAuth {
+  type: "oauth";
+  authorizationUrl: string;
+  tokenUrl: string;
+  /** Backend path that returns the signed-in user, e.g. "/me". */
+  userInfoPath: string;
+  /** RFC 6901 pointer to the user's ID in that response. Defaults to "/id". */
+  userIdPointer?: string;
+  scopes?: string[];
+  /** How the server authenticates to tokenUrl. Defaults to client_secret_basic. */
+  tokenAuthMethod?: "client_secret_basic" | "client_secret_post" | "none";
+}
+
+export type BackendAuth = { type: "none" } | { type: "bearer"; secret: string } | BackendOAuth;
+
 export interface BackendConfig {
   baseUrl: string;
-  auth?: { type: "none" } | { type: "bearer"; secret: string };
+  auth?: BackendAuth;
   timeoutMs?: number;
 }
 

@@ -2,19 +2,19 @@
 
 Omnintent v0.1 is experimental. Everything below was checked on November 24, 2026, in a Linux
 container with Node.js 22.23, no Swift toolchain, no Android SDK, and Google Maven blocked by the
-network policy.
+network policy. Per-user OAuth sign-in for the MCP server was added and checked the same day.
 
 ## Verified by running it
 
 | Area | How | Result |
 | --- | --- | --- |
 | CLI | `tsc` 5.9.3, strict mode, for sources and tests | No errors. |
-| Validator | 21 tests: schema errors, every error rule, CLI exit codes | Pass. |
+| Validator | 22 tests: schema errors, every error rule, CLI exit codes | Pass. |
 | Generators | Golden files: the example's Swift, Kotlin and MCP output must equal the committed files byte for byte; regenerating twice gives identical output | Pass. |
-| MCP Worker types | `tsc --noEmit` on the generated project against the real `@modelcontextprotocol/server` 2.4.0, `agents` 0.34.0 and `@cloudflare/workers-types` 5.x declarations (a planted type error is caught) | No errors. |
-| MCP end to end on Node | Generated `scripts/serve-node.mjs` (the Worker's own `fetch` handler), the example mock backend, the official `@modelcontextprotocol/client` 2.4.0 pinned to protocol 2026-07-28 | 7 tests pass (see the list below). |
-| MCP end to end on workerd | The same 7 tests against `wrangler dev` 4.167.0, which runs the Worker in local workerd | Pass. |
-| Payment rules on MCP | A generated payment server: refuses without elicitation (2026 and 2025 clients); pays after confirmation; strips `sensitive` fields | Pass. |
+| MCP Worker types | `tsc --noEmit` on both kinds of generated project (OAuth sign-in and shared token) against the real `@modelcontextprotocol/server` 2.4.0, `agents` 0.34.0, `@cloudflare/workers-oauth-provider` 1.3.0 and `@cloudflare/workers-types` 5.x declarations | No errors. |
+| MCP with OAuth, end to end on Node | Generated `scripts/serve-node.mjs` (the Worker's own `fetch` handler, KV in memory), the example mock backend acting as the app's own OAuth server, the official `@modelcontextprotocol/client` 2.4.0 doing discovery, registration and PKCE, and a scripted browser for the consent and sign-in pages | 11 tests pass (see the list below). |
+| MCP with OAuth, end to end on workerd | The same 11 tests against `wrangler dev` 4.167.0, which runs the Worker in local workerd with local KV | Pass. |
+| MCP with a shared token | A generated payment server (bearer backend): type-checks; refuses requests without the token; refuses to pay without elicitation (2026 and 2025 clients); pays after confirmation; strips `sensitive` fields | Pass. |
 | Kotlin | `kotlinc` 2.4.21 (from GitHub releases) compiles the generated code for three manifests, plus handler implementations, against hand-written **stubs** of the AppFunctions and Android APIs (`packages/cli/test/fixtures/kotlin-stubs`) | Compiles. |
 | Swift | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
@@ -25,17 +25,30 @@ network policy.
 | Submission helper | 13 tests: every draft file, internal-TestFlight-only wording, Apple's 4,000-byte App Review notes limit, Android exposure matching the safety table, MCP annotations and withheld fields, warnings, and that it works with `fetch` disabled | Pass. |
 | Discovery, AI path | Against a **fake** Messages API: request shape (URL, headers, `claude-opus-5-5`, `output_config.format`), conversion, the repair loop, giving up on persistent errors, and the CLI writing nothing when the draft stays invalid | Pass. |
 
-The 7 end-to-end checks run on each runtime:
+The 11 end-to-end checks run on each runtime:
 
-1. Requests without the access token get 401.
-2. `tools/list` returns 6 tools with the right annotations and schemas.
-3. Add, list and complete change the backend state; internal `notes` never appear.
-4. `delete_item` asks through elicitation; a decline leaves the item and an accept deletes it.
-5. The opted-in confirmation on `share_list` works, and an undeclared backend field is stripped.
-6. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
-7. A 2025-era client lists and calls tools through the stateless fallback.
+1. Requests without a token, or with a made-up one, get 401 with a `resource_metadata` pointer.
+   The Protected Resource Metadata and authorization server metadata name the right URLs, scopes
+   and PKCE method.
+2. A person signs in: the official client registers, opens the consent page, the person allows and
+   signs in to the backend, and the client gets a token for `mcp:read mcp:write`. The consent page
+   escapes the client's name, shows the redirect host, warns about a local app, and cannot be
+   framed. `tools/list` returns 6 tools with the right annotations and schemas.
+3. Add, list and complete change that person's backend data; internal `notes` never appear. A
+   second person sees only their own data.
+4. The backend never receives the MCP token; it only sees backend tokens.
+5. `delete_item` asks through elicitation; a decline leaves the item and an accept deletes it.
+6. The opted-in confirmation on `share_list` works, and an undeclared backend field is stripped.
+7. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
+8. Unticking "Make changes" gives a read-only token: read tools work, `add_item` gets `403`
+   `insufficient_scope` naming both scopes, and nothing changes.
+9. "Deny" sends the client `access_denied` with the issuer (`iss`).
+10. Refreshing the MCP token refreshes a nearly expired backend token. After the backend revokes
+    access, the refresh fails with `invalid_grant` and the grant's tokens stop working.
+11. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 147 tests across 8 files (`npm test`; one is skipped when a tool is missing).
+Total: 160 tests across 8 files (`npm test`), all passing on November 24, 2026, with the Kotlin
+compile included (it is skipped when kotlinc is missing).
 
 ## Not verified
 
@@ -84,10 +97,24 @@ Total: 147 tests across 8 files (`npm test`; one is skipped when a tool is missi
 - Not tested with real hosts (Claude, ChatGPT, Gemini Spark, Meta Muse). Hosts that do not support
   protocol 2026-07-28 or form elicitation fall back to their own confirmation for destructive tools,
   and cannot run payment tools.
-- **OAuth is not implemented.** Inbound access is a single pre-shared bearer token
-  (`MCP_ACCESS_TOKEN`), and every caller shares one backend account (`BACKEND_TOKEN`). The OAuth 2.1
-  path (`@cloudflare/workers-oauth-provider`, Protected Resource Metadata) is documented as the next
-  step, not generated. Whether each host accepts a static bearer header was not verified.
+- **OAuth sign-in was tested only locally, against the mock backend.** Not verified:
+  - With any real MCP host. Whether Claude, ChatGPT, Gemini Spark or Meta Muse complete the flow,
+    which registration method each uses, and whether each handles the `403` `insufficient_scope`
+    step-up (or simply fails) are untested.
+  - Client ID Metadata Documents. `wrangler dev` advertises CIMD support, but no test registers a
+    client that way; every test client uses Dynamic Client Registration. On the Node adapter CIMD is
+    off, because it needs the Workers `global_fetch_strictly_public` flag.
+  - With a real backend OAuth server (for example Auth0, Clerk, Supabase or your own). The mock
+    accepts any user name. Providers that need extra parameters (such as `audience`), return the
+    user ID only in an `id_token`, or do not support PKCE are not handled.
+  - Deployed on Cloudflare. KV was the local simulation in `wrangler dev` and an in-memory stand-in
+    on Node. The generated `wrangler.jsonc` needs a real KV namespace ID before deploy.
+  - Remembered consent (`CONSENT_SECRET`) is generated but has no test.
+- Shared-token servers (`bearer` or `none` backends) still use one pre-shared token
+  (`MCP_ACCESS_TOKEN`), and every caller shares one backend account. Whether each host accepts a
+  static bearer header was not verified.
+- The consent page appears before the backend sign-in, so it cannot show who is signing in. That is
+  the order MCP's guidance on proxy servers requires (consent per client before the redirect).
 - The server trusts the client's elicitation answer, as the protocol intends. There is no signed
   `requestState` binding a confirmation to specific arguments.
 - MCP's Skills extension (in the SDK as `@modelcontextprotocol/server/ext/skills`) is not used.
@@ -159,6 +186,9 @@ could not be fetched. See `docs/RESEARCH.md`.
 
 ## Known gaps in v0.1 (by design)
 
+- **OAuth needs the backend's own OAuth server.** A backend that only has its own login (sessions,
+  API keys) and no OAuth endpoints cannot use per-user sign-in yet. Signing in through a third
+  party (Google, GitHub) and telling the backend who the user is, is not generated.
 - **Schema subset.** No nested objects in parameters or entities; no lists of entities as
   parameters; no files or images; no pagination convention; no API-key-header backend auth (bearer
   only).

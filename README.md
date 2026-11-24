@@ -1,0 +1,111 @@
+# Omnintent
+
+**Describe your app's actions once. Reach Siri, Gemini on Android, and every MCP agent.**
+
+Status: **v0.1, experimental.** The platform APIs it targets are themselves previews or brand new.
+Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before you rely on it.
+
+## The problem
+
+AI agents now act inside apps, but every platform wants its own integration:
+
+- **Siri** (Siri AI Developer Preview) calls App Intents that you mark as tools in Swift.
+- **Gemini on Android** calls AppFunctions that you declare in Kotlin (Android 16+).
+- **Cloud agents** (Claude, ChatGPT, Gemini Spark, Meta Muse and others) call MCP servers.
+
+That is three codebases, three description formats and three sets of safety rules for the same
+"add an item to my list". They drift apart, and the descriptions agents depend on get written three
+times, badly.
+
+## How it works
+
+1. **Discover.** `omnintent discover` drafts `omnintent.json` from your OpenAPI file or codebase.
+   With an Anthropic API key, Claude writes the descriptions and sample utterances; without one, a
+   deterministic OpenAPI path still works. You review a draft instead of writing from scratch.
+2. **Describe.** The manifest lists your actions as MCP-style tools (name, title, description, JSON
+   Schema inputs and outputs). It adds what phones need: a safety level (read, write, destructive or
+   payment), entities with privacy settings, confirmation prompts, and sample utterances.
+3. **Check.** `omnintent validate` applies the [rule book](SPEC.md): unique snake_case names, real
+   descriptions, at least two sample utterances per action, and confirmation for destructive and
+   payment actions. `omnintent test` checks that each utterance matches its expected arguments.
+4. **Generate.** `omnintent generate` writes three things:
+   - Swift `@AppIntent(.tool)` intents and entities.
+   - A Kotlin `AppFunctionService` with KDoc written from your descriptions.
+   - A Cloudflare Workers MCP server that forwards each tool call to your existing backend.
+
+   Your app implements one small handler interface per platform. Safety levels become MCP
+   annotations and server-side confirmation, Siri authentication policies and `requestConfirmation`,
+   and Android rules about what may be exposed at all.
+
+## Quickstart
+
+Requires Node.js 22.18 or later.
+
+```sh
+npm install
+npm run build
+
+# Try the example: a to-do app with six actions.
+node packages/cli/dist/cli.js validate examples/todo/omnintent.json
+node packages/cli/dist/cli.js test examples/todo/omnintent.json --plan /tmp/todo-plan
+node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all --out /tmp/todo-out
+
+# Draft a manifest from an OpenAPI file (set ANTHROPIC_API_KEY to let Claude refine it).
+node packages/cli/dist/cli.js discover examples/todo/openapi.yaml --out /tmp/omnintent.json
+
+# Run the generated MCP server against the mock backend.
+PORT=8788 MOCK_BACKEND_TOKEN=dev node examples/todo/mock-backend/server.mjs &
+cd examples/todo/generated/mcp
+BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run dev (wrangler)
+# MCP endpoint: http://127.0.0.1:8787/mcp
+```
+
+Run everything (build, type checks, 79 tests including end-to-end MCP on Node and workerd):
+
+```sh
+npm test
+```
+
+The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlinc.sh` downloads it
+from GitHub releases into `.tools/`.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `omnintent validate <manifest> [--json]` | JSON Schema plus rule book checks, with rule IDs and paths. |
+| `omnintent generate <manifest> --target swift\|kotlin\|mcp\|all --out <dir>` | Deterministic code generation. |
+| `omnintent discover <openapi-file\|dir> [--out omnintent.json] [--no-ai] [--model <id>]` | Drafts a manifest. It never writes an invalid one. |
+| `omnintent test <manifest> [--plan <dir>]` | Utterance checks, plus test plans for SiriEvaluations, adb and MCP. |
+
+## Repository
+
+```
+SPEC.md                        Omnintent Rule Book v0.1 (the open standard)
+schema/omnintent.schema.json   JSON Schema for omnintent.json
+packages/cli/                  The omnintent CLI (TypeScript)
+examples/todo/                 Example manifest, OpenAPI file, mock backend, generated output
+docs/RESEARCH.md               Platform research with sources (November 2026)
+docs/ARCHITECTURE.md           Components and the agentic roadmap
+docs/LIMITATIONS.md            What is and is not verified
+```
+
+## Safety in one table
+
+| Safety | MCP | Siri | Android |
+| --- | --- | --- | --- |
+| read | `readOnlyHint` | no confirmation | exposed |
+| write | hints; optional confirmation | requires authentication; optional confirmation | exposed (opt-in if it needs confirmation) |
+| destructive | `destructiveHint`; confirmation by elicitation, else the host confirms | `requestConfirmation`, destructive button | opt-in only, generated disabled |
+| payment | confirmation by elicitation, refused otherwise | local-device authentication, `.pay` confirmation | never |
+
+Details are in [SPEC.md section C](SPEC.md#c-safety-levels-and-confirmation).
+
+## Contributing
+
+The rule book is meant to be implemented by others. Issues and pull requests that improve the spec,
+add a platform mapping, or report a platform API change (with a source) are welcome.
+
+## License
+
+MIT. Copyright (c) 2026 Omnintent contributors.

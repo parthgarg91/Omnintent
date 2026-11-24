@@ -18,12 +18,14 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
-    "tree-sitter": "^0.22.4",
-    "tree-sitter-swift": "^0.7.1",
     "typescript": "^5.9.3",
     "vitest": "^5.1.1"
   },
   "engines": {
     "node": ">=22.18"
+  },
+  "optionalDependencies": {
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-swift": "^0.7.1"
   }
 }

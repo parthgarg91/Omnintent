@@ -513,7 +513,18 @@ Live testing uses the same cases. `omnintent test --plan <dir>` writes:
 - `siri-requests.md`: requests to script with Apple's SiriEvaluations framework.
 - `adb-commands.sh`: `adb shell cmd app_function execute-app-function …` per Android function.
 
-Running live agents and scoring their tool choices is future work (see `docs/ARCHITECTURE.md`).
+`--plan` also writes `siri/OmnintentSiriEvaluations.swift` (a SiriEvaluations scenario per sample),
+`android/run-functions.sh` and `android/agent-checklist.md`, and a `results.json` template per
+platform for recording what a device agent did.
+
+`omnintent agent-test` runs the cases against a model acting as the agent. It sees the tools as a
+host would (from a live MCP server's `tools/list`, or projected from the manifest for MCP, iOS or
+Android). Read-only tools are called to answer lookups. The first call to any other tool is the
+agent's decision and is recorded, never executed. A case passes when that decision names the
+expected action with arguments that match `expectedArguments`: free text matches ignoring case,
+quotes and trailing punctuation, an omitted argument may equal its default, and dates, numbers and
+entity IDs must match exactly. When a platform does not expose the expected action (for example a
+destructive action on Android), the case passes only if the agent makes no write call.
 
 ---
 

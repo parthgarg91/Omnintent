@@ -7,6 +7,7 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { formatBuildReport, GitHubRest, loadBuilderConfig, runBuilder } from "./builder/index.js";
 import { AGENT_COMMANDS, AGENT_HELP, submitPrepCommand, watchCommand } from "./agents/commands.js";
+import { runAgentCommand, TESTER_COMMANDS, TESTER_USAGE } from "./agents/tester/command.js";
 import { discover } from "./discover/index.js";
 import { generate, parseTargets, writeFiles } from "./generators/index.js";
 import { CLI_VERSION, type Manifest } from "./manifest.js";
@@ -22,7 +23,7 @@ Usage:
   omnintent test <omnintent.json> [--plan <dir>] [--json]
   omnintent build [--config omnintent.builder.json] [--since <git-ref>] [--platform swift,kotlin,mcp]
                   [--dry-run <dir>] [--no-ai] [--model <id>] [--json]
-${AGENT_HELP}
+${AGENT_HELP}${TESTER_USAGE}
 Commands:
   validate  Check the manifest against the JSON Schema and the rule book.
   generate  Write Swift App Intents, Kotlin AppFunctions and/or an MCP server.
@@ -30,13 +31,14 @@ Commands:
             ANTHROPIC_API_KEY set, Claude refines the draft. Only a valid
             manifest is ever written.
   test      Check that sample utterances match their expected arguments.
-            --plan writes test cases for SiriEvaluations, adb and MCP.
+            --plan writes test cases, a SiriEvaluations test file, and
+            Android adb and agent checklists.
   build     Builder agent: regenerate each configured platform, wire it into
             the app with Claude (ANTHROPIC_API_KEY), and open one draft pull
             request per platform (GITHUB_TOKEN). Never merges or deploys.
             --since compares with the manifest at a git ref; --dry-run writes
             the planned branches to a folder instead of GitHub.
-${AGENT_COMMANDS}`;
+${AGENT_COMMANDS}${TESTER_COMMANDS}`;
 
 function fail(message: string): never {
   process.stderr.write(`omnintent: ${message}\n`);
@@ -59,6 +61,9 @@ function loadValid(path: string, json: boolean): Manifest {
 }
 
 async function main(argv: string[]): Promise<void> {
+  // The tester agent parses its own options.
+  const agentExit = argv[0] ? await runAgentCommand(argv[0], argv.slice(1)) : undefined;
+  if (agentExit !== undefined) process.exit(agentExit);
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,

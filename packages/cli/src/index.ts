@@ -34,3 +34,4 @@ export {
 export { runWatch, formatWatchReport, issueTitle, researchBaseline, httpFetcher, type WatchReport, type WatchState, type Finding, type Fetcher } from "./agents/watch/watch.js";
 export { WATCH_SOURCES, type WatchSource } from "./agents/watch/sources.js";
 export { prepareSubmission, parseSubmitPlatforms, APPLE_LIMITS, type SubmissionBundle } from "./agents/submit/submit.js";
+export * from "./agents/index.js";

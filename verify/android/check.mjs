@@ -28,7 +28,8 @@ function summary(xml) {
     const id = body.match(/<id>([^<]*)<\/id>/)[1].split("#")[1];
     out.push(`     ${id} enabledByDefault=${body.match(/<enabledByDefault>(\w+)/)?.[1]}`);
     for (const p of body.split("<parameters>").slice(1).map((s) => s.split("</parameters>")[0])) {
-      const get = (tag) => p.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1];
+      // Nested types repeat tags; the parameter's own values come last.
+      const get = (tag) => [...p.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, "g"))].pop()?.[1];
       const enums = [...p.matchAll(/<enumValues>([^<]*)<\/enumValues>/g)].map((m) => m[1]);
       out.push(`       ${get("name")}: type=${get("type")} ref=${get("dataTypeReference") ?? "-"} nullable=${get("isNullable")} required=${get("isRequired")}${enums.length ? ` enum=${enums.join("|")}` : ""}`);
     }

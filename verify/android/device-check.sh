@@ -8,7 +8,9 @@ status=0
 fail() { echo "FAIL $*"; status=1; }
 
 sdk=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
-echo "Emulator API level: $sdk"
+echo "Emulator API level: $sdk ($(adb shell getprop ro.build.version.release | tr -d '\r'), $(adb shell getprop ro.build.fingerprint | tr -d '\r'))"
+echo "AppFunction services:"; adb shell service list | grep -i function
+echo "Shell commands:"; adb shell cmd -l | grep -i function
 
 for dir in modules/*/; do
   name=$(basename "$dir")

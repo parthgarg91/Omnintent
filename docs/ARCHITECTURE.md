@@ -56,7 +56,7 @@ deploy, publish or submit on its own.
 1. **Discovery agent** (v0.1: `omnintent discover`). Reads a codebase or OpenAPI file and drafts
    `omnintent.json`: actions, safety levels, entities, privacy, descriptions and sample utterances.
    Output is a diff for review. *Human gate:* a developer approves the manifest.
-2. **Builder agent.** On an approved manifest change, it runs `omnintent generate`. It then wires the
+2. **Builder agent** (`omnintent build`, see `docs/BUILDER.md`). On an approved manifest change, it runs `omnintent generate`. It then wires the
    handlers into the app's existing code (Swift `OmnintentHandlers`, Kotlin `OmnintentHandlers`,
    backend routes) and opens a pull request per platform, with a checklist from the generated
    READMEs. *Human gate:* code review and merge.

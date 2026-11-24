@@ -179,7 +179,7 @@
           "day": {
             "type": "string",
             "format": "date",
-            "description": "The day of the reading, as YYYY-MM-DD.",
+            "description": "The day of the reading.",
             "title": "Day"
           },
           "takenAt": {

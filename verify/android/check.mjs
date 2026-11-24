@@ -34,6 +34,18 @@ function summary(xml) {
       out.push(`       ${get("name")}: type=${get("type")} ref=${get("dataTypeReference") ?? "-"} nullable=${get("isNullable")} required=${get("isRequired")}${enums.length ? ` enum=${enums.join("|")}` : ""}`);
     }
   }
+  // How AppFunctions represents platform types (LocalDate, Instant, Uri) as objects.
+  for (const dt of xml.split("<dataTypes>").slice(1)) {
+    const body = dt.split("</dataTypes>")[0];
+    const name = [...body.matchAll(/<name>([^<]*)<\/name>/g)].pop()?.[1] ?? "";
+    if (!/^(java|android)\./.test(name)) continue;
+    const props = [...body.matchAll(/<properties>([\s\S]*?)<\/properties>/g)].map((m) => {
+      const n = [...m[1].matchAll(/<name>([^<]*)<\/name>/g)].pop()?.[1];
+      const t = [...m[1].matchAll(/<type>([^<]*)<\/type>/g)].pop()?.[1];
+      return `${n}:${t}`;
+    });
+    out.push(`     type ${name} = { ${props.join(", ")} }`);
+  }
   return out.join("\n");
 }
 

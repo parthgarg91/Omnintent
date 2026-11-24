@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { generate, writeFiles } from "../src/generators/index.js";
-import { generateKotlin } from "../src/generators/kotlin.js";
+import { appFunctionsValue, generateKotlin } from "../src/generators/kotlin.js";
 import { generateMcp } from "../src/generators/mcp.js";
 import { generateSwift } from "../src/generators/swift.js";
 import type { Manifest } from "../src/manifest.js";
@@ -168,6 +168,15 @@ describe("kotlin generator", () => {
     const pay = generateKotlin(paymentManifest());
     expect(pay.map((f) => f.path)).toEqual(["README.md"]);
     expect(file(pay, "README.md")).toContain("`place_order` (payment): moves money, so it is never exposed on Android.");
+  });
+
+  it("writes date, date-time and URI examples as the objects AppFunctions expects", () => {
+    expect(appFunctionsValue("2027-04-15", { type: "string", format: "date" })).toEqual({ year: 2027, month: 4, dayOfMonth: 15 });
+    expect(appFunctionsValue("2026-11-24T12:00:00.250Z", { type: "string", format: "date-time" })).toEqual({ epochSecond: 1795521600, nano: 250_000_000 });
+    expect(appFunctionsValue(["https://a.example"], { type: "array", items: { type: "string", format: "uri" } })).toEqual([{ uri: "https://a.example" }]);
+    expect(appFunctionsValue("milk", { type: "string" })).toBe("milk");
+    const service = file(files, `${dir}/BaseTodoExampleAppFunctionService.kt`);
+    expect(service).toContain('Example: {"year":2027,"month":4,"dayOfMonth":15}.');
   });
 
   it("keeps sensitive properties out of serializable classes", () => {

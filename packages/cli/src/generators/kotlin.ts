@@ -252,6 +252,30 @@ function handlersFile(manifest: Manifest, names: KotlinNames, actions: Action[])
   ]);
 }
 
+/**
+ * A manifest value as AppFunctions expects it in JSON. LocalDate, Instant and Uri are
+ * objects there, not strings (an emulator rejects "2027-04-15" for a LocalDate).
+ */
+export function appFunctionsValue(value: unknown, schema: { type: string; format?: string; items?: { type: string; format?: string } }): unknown {
+  if (Array.isArray(value)) return schema.items ? value.map((v) => appFunctionsValue(v, schema.items!)) : value;
+  if (typeof value !== "string") return value;
+  if (schema.format === "date") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return m ? { year: Number(m[1]), month: Number(m[2]), dayOfMonth: Number(m[3]) } : value;
+  }
+  if (schema.format === "date-time") {
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? value : { epochSecond: Math.floor(ms / 1000), nano: (((ms % 1000) + 1000) % 1000) * 1_000_000 };
+  }
+  if (schema.format === "uri") return { uri: value };
+  return value;
+}
+
+function appFunctionsArgs(action: Action, args: Record<string, unknown>): Record<string, unknown> {
+  const props = action.inputSchema.properties ?? {};
+  return Object.fromEntries(Object.entries(args).map(([k, v]) => [k, props[k] ? appFunctionsValue(v, props[k]) : v]));
+}
+
 function formatExample(value: unknown): string | undefined {
   return value === undefined ? undefined : JSON.stringify(value);
 }
@@ -280,7 +304,8 @@ function returnDoc(manifest: Manifest, action: Action): string | undefined {
 function functionBlock(manifest: Manifest, action: Action): string[] {
   const params = kParams(action);
   const docs = params.map((p) => {
-    const example = formatExample(exampleValue(p.name, p.schema, action.examples));
+    const raw = exampleValue(p.name, p.schema, action.examples);
+    const example = formatExample(raw === undefined ? undefined : appFunctionsValue(raw, p.schema));
     const d = p.schema.description.toLowerCase();
     const listsValues = p.schema.enum?.every((v) => d.includes(v.toLowerCase()));
     const values = p.schema.enum && !listsValues ? ` One of: ${p.schema.enum.join(", ")}.` : "";
@@ -521,6 +546,6 @@ function androidReason(action: Action): string {
 export function adbExecute(manifest: Manifest, names: KotlinNames, action: Action, args?: Record<string, unknown>): string {
   const pkg = manifest.app.android?.packageName ?? names.packageName;
   const fn = `${names.servicePackage}.${names.baseClass}#${camelCase(action.name)}`;
-  const params = JSON.stringify(args ?? action.examples[0]?.arguments ?? {});
+  const params = JSON.stringify(appFunctionsArgs(action, args ?? action.examples[0]?.arguments ?? {}));
   return `adb shell "cmd app_function execute-app-function --package ${pkg} --function '${fn}' --parameters '${params.replace(/"/g, '\\"')}'"`;
 }

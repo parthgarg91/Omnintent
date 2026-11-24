@@ -29,7 +29,24 @@ class FakeFieldNotesHandlers : OmnintentHandlers {
         flags: BooleanArray,
         days: List<LocalDate>,
         links: List<Uri>,
-    ): LogReadingResult = LogReadingResult(readingId = "r-1", total = count, scores = samples, warnings = tags)
+    ): LogReadingResult = LogReadingResult(
+        readingId = "r-1",
+        total = count,
+        scores = samples,
+        // Echo what arrived so a device run shows how each type was decoded.
+        warnings = tags + listOfNotNull(
+            "limit=$limit",
+            "serial=$serial",
+            "temperature=$temperature",
+            "verified=$verified",
+            "unit=$unit",
+            day?.let { "day=$it" },
+            takenAt?.let { "takenAt=$it" },
+            photo?.let { "photo=$it" },
+        ) + days.map { "visited=$it" } + links.map { "link=$it" },
+        link = photo,
+        savedAt = takenAt,
+    )
 
     override suspend fun getReading(readingId: String): Reading = Reading(id = readingId, label = "north creek", count = 3)
 

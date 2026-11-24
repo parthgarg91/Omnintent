@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// omnintent: validate, generate, discover, test.
+// omnintent: validate, generate, discover, test, build.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { formatBuildReport, GitHubRest, loadBuilderConfig, runBuilder } from "./builder/index.js";
+import { AGENT_COMMANDS, AGENT_HELP, submitPrepCommand, watchCommand } from "./agents/commands.js";
+import { runAgentCommand, TESTER_COMMANDS, TESTER_USAGE } from "./agents/tester/command.js";
 import { discover } from "./discover/index.js";
 import { generate, parseTargets, writeFiles } from "./generators/index.js";
 import { CLI_VERSION, type Manifest } from "./manifest.js";
@@ -17,7 +21,9 @@ Usage:
   omnintent generate <omnintent.json> --target swift|kotlin|mcp|all --out <dir>
   omnintent discover <openapi-file|code-directory> [--out omnintent.json] [--no-ai] [--model <id>] [--force]
   omnintent test <omnintent.json> [--plan <dir>] [--json]
-
+  omnintent build [--config omnintent.builder.json] [--since <git-ref>] [--platform swift,kotlin,mcp]
+                  [--dry-run <dir>] [--no-ai] [--model <id>] [--json]
+${AGENT_HELP}${TESTER_USAGE}
 Commands:
   validate  Check the manifest against the JSON Schema and the rule book.
   generate  Write Swift App Intents, Kotlin AppFunctions and/or an MCP server.
@@ -25,8 +31,14 @@ Commands:
             ANTHROPIC_API_KEY set, Claude refines the draft. Only a valid
             manifest is ever written.
   test      Check that sample utterances match their expected arguments.
-            --plan writes test cases for SiriEvaluations, adb and MCP.
-`;
+            --plan writes test cases, a SiriEvaluations test file, and
+            Android adb and agent checklists.
+  build     Builder agent: regenerate each configured platform, wire it into
+            the app with Claude (ANTHROPIC_API_KEY), and open one draft pull
+            request per platform (GITHUB_TOKEN). Never merges or deploys.
+            --since compares with the manifest at a git ref; --dry-run writes
+            the planned branches to a folder instead of GitHub.
+${AGENT_COMMANDS}${TESTER_COMMANDS}`;
 
 function fail(message: string): never {
   process.stderr.write(`omnintent: ${message}\n`);
@@ -49,6 +61,9 @@ function loadValid(path: string, json: boolean): Manifest {
 }
 
 async function main(argv: string[]): Promise<void> {
+  // The tester agent parses its own options.
+  const agentExit = argv[0] ? await runAgentCommand(argv[0], argv.slice(1)) : undefined;
+  if (agentExit !== undefined) process.exit(agentExit);
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -60,6 +75,16 @@ async function main(argv: string[]): Promise<void> {
       "no-ai": { type: "boolean" },
       model: { type: "string" },
       force: { type: "boolean" },
+      config: { type: "string" },
+      since: { type: "string" },
+      "dry-run": { type: "string" },
+      research: { type: "string" },
+      state: { type: "string" },
+      "update-state": { type: "boolean" },
+      report: { type: "string" },
+      "report-json": { type: "string" },
+      only: { type: "string" },
+      platform: { type: "string" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -126,6 +151,54 @@ async function main(argv: string[]): Promise<void> {
         process.stdout.write(`Wrote test plan (${files.map((f) => f.path).join(", ")}) to ${values.plan}\n`);
       }
       if (!report.ok) process.exit(1);
+      return;
+    }
+    case "build": {
+      const configPath = resolve(values.config ?? "omnintent.builder.json");
+      if (!existsSync(configPath)) fail(`${configPath} does not exist (see docs/BUILDER.md)`);
+      const config = loadBuilderConfig(configPath);
+      const repoRoot = dirname(configPath);
+      const manifestPath = resolve(repoRoot, config.manifest);
+      const manifest = loadValid(manifestPath, false);
+      let previousManifest: Manifest | undefined;
+      if (values.since) {
+        try {
+          const text = execFileSync("git", ["show", `${values.since}:${config.manifest}`], { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+          previousManifest = JSON.parse(text) as Manifest;
+        } catch {
+          process.stderr.write(`No ${config.manifest} at ${values.since}; treating this as the first build.\n`);
+        }
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const log = (m: string) => process.stderr.write(`${m}\n`);
+      if (!apiKey && !values["no-ai"]) log("ANTHROPIC_API_KEY is not set: regenerating code only, without AI wiring.");
+      const dryRunDir = values["dry-run"] ? resolve(values["dry-run"]) : undefined;
+      const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+      if (!dryRunDir && !token) fail("GITHUB_TOKEN is not set; set it or use --dry-run <dir>");
+      const report = await runBuilder({
+        config,
+        repoRoot,
+        manifest,
+        previousManifest,
+        platforms: values.platform ? parseTargets(values.platform) : undefined,
+        ai: apiKey && !values["no-ai"] ? { apiKey, baseUrl: process.env.ANTHROPIC_BASE_URL, model: values.model } : undefined,
+        git: token ? new GitHubRest({ repo: config.repo, token, branchPrefix: config.branchPrefix, apiUrl: process.env.GITHUB_API_URL }) : undefined,
+        dryRunDir,
+        log,
+      });
+      if (values.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      else process.stdout.write(`${formatBuildReport(report)}\n`);
+      if (report.platforms.some((p) => p.status === "failed")) process.exit(1);
+      return;
+    }
+    case "watch": {
+      await watchCommand(values);
+      return;
+    }
+    case "submit-prep": {
+      if (!input) fail("usage: omnintent submit-prep <omnintent.json> --out <dir>");
+      if (!values.out) fail("--out <dir> is required");
+      submitPrepCommand(loadValid(input, false), values.out, values.platform);
       return;
     }
     default:

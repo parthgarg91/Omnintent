@@ -1,0 +1,110 @@
+# Watcher agent (docs/ARCHITECTURE.md, agent 5).
+#
+# Every Monday it checks the Siri, AppFunctions, MCP and Cloudflare sources against
+# docs/RESEARCH.md and docs/watch-state.json. When something moved it opens one issue
+# (never a duplicate of an open one) and, when the snapshot changed, a pull request that
+# updates docs/watch-state.json. It never edits the rule book, generators or RESEARCH.md,
+# and it never merges anything. A maintainer reads the sources and decides.
+#
+# On pull requests that touch the watcher it only runs as a dry run and writes the report
+# to the job summary.
+
+name: Watcher agent
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packages/cli/src/agents/watch/**"
+      - ".github/workflows/watcher.yml"
+      - "docs/RESEARCH.md"
+      - "docs/watch-state.json"
+
+permissions:
+  contents: read
+
+# Pull request dry runs replace each other. Real runs (schedule, manual) are never cancelled
+# halfway, because they open issues and push a snapshot branch.
+concurrency:
+  group: watcher-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build the CLI
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build -w omnintent
+
+      - name: Check sources
+        run: |
+          node packages/cli/dist/cli.js watch \
+            --research docs/RESEARCH.md \
+            --state docs/watch-state.json \
+            --update-state \
+            --report "$RUNNER_TEMP/watch-report.md" \
+            --report-json "$RUNNER_TEMP/watch-report.json" > /dev/null
+          cat "$RUNNER_TEMP/watch-report.md" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open an issue when something moved
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          report="$RUNNER_TEMP/watch-report.json"
+          if [ "$(jq -r .actionable "$report")" != "true" ]; then
+            echo "Nothing actionable."
+            exit 0
+          fi
+          fp="$(jq -r .fingerprint "$report")"
+          if gh issue list --state open --label watcher --limit 100 --json body --jq '.[].body' | grep -qF "fingerprint:$fp"; then
+            echo "An open issue already covers fingerprint $fp."
+            exit 0
+          fi
+          gh label create watcher --color BFD4F2 --description "Opened by the watcher agent" 2>/dev/null || true
+          gh issue create --label watcher --title "$(jq -r .title "$report")" --body-file "$RUNNER_TEMP/watch-report.md"
+
+      - name: Propose the new snapshot as a pull request
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- docs/watch-state.json && git ls-files --error-unmatch docs/watch-state.json >/dev/null 2>&1; then
+            echo "Snapshot unchanged."
+            exit 0
+          fi
+          branch="watcher/snapshot-$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add docs/watch-state.json
+          git commit -m "Update watcher snapshot" -m "Recorded by the watcher agent. See the run's summary for what changed."
+          git push -u origin "$branch"
+          # Keep one snapshot pull request open at a time: close older ones this agent opened.
+          gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("watcher/snapshot-")) | .number' |
+            while read -r old; do
+              gh pr close "$old" --delete-branch --comment "Replaced by a newer snapshot from run ${GITHUB_RUN_ID}." || true
+            done
+          # Creating pull requests with GITHUB_TOKEN needs "Allow GitHub Actions to create and
+          # approve pull requests" in the repository's Actions settings. Without it, the branch
+          # is still pushed and a maintainer can open the pull request by hand.
+          gh pr create --head "$branch" --title "Watcher: update snapshot ($(date -u +%Y-%m-%d))" \
+            --body-file "$RUNNER_TEMP/watch-report.md" \
+            || echo "::warning::Could not open a pull request for $branch. Enable 'Allow GitHub Actions to create and approve pull requests', or open it by hand."

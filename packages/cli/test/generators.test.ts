@@ -265,11 +265,44 @@ describe("mcp generator", () => {
     expect(() => generateMcp(variant((m) => delete m.backend))).toThrow(/backend section/);
   });
 
-  it("writes a Workers project", () => {
+  it("writes a Workers project with OAuth sign-in when the backend uses OAuth", () => {
     const pkg = JSON.parse(file(files, "package.json"));
-    expect(pkg.dependencies).toMatchObject({ "@modelcontextprotocol/server": "2.4.0", agents: "0.34.0" });
+    expect(pkg.dependencies).toEqual({
+      "@cloudflare/workers-oauth-provider": "1.3.0",
+      "@modelcontextprotocol/server": "2.4.0",
+      agents: "0.34.0",
+      zod: "^4.2.0",
+    });
     expect(pkg.devDependencies.wrangler).toBeDefined();
-    expect(file(files, "wrangler.jsonc")).toContain('"compatibility_flags": [\n    "nodejs_compat"\n  ]');
-    expect(file(files, "src/index.ts")).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    const wrangler = file(files, "wrangler.jsonc");
+    expect(wrangler).toContain('"compatibility_flags": [\n    "nodejs_compat",\n    "global_fetch_strictly_public"\n  ]');
+    expect(wrangler).toContain('"binding": "OAUTH_KV"');
+    expect(wrangler).toContain('"BACKEND_OAUTH_TOKEN_URL": "http://localhost:8788/oauth/token"');
+    expect(files.map((f) => f.path)).toContain("src/oauth.ts");
+    expect(files.map((f) => f.path)).not.toContain("src/auth.ts");
+    expect(file(files, "src/index.ts")).toContain('import { handleRequest } from "./oauth.ts";');
+    const oauth = file(files, "src/oauth.ts");
+    expect(oauth).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    expect(oauth).toContain("resource: `${serverUrl}/mcp`");
+    expect(oauth).toContain('code_challenge_method", "S256"');
+    // Defaults are filled in, and no credentials end up in generated files.
+    expect(file(files, "src/tools.ts")).toContain('"userIdPointer": "/id"');
+    expect(file(files, "src/tools.ts")).toContain('"tokenAuthMethod": "client_secret_basic"');
+    for (const f of files) expect(f.content).not.toMatch(/todo-mcp-secret|BACKEND_TOKEN=/);
+    expect(file(files, "README.md")).toContain("`MCP_SERVER_URL`");
+    expect(file(files, ".dev.vars.example")).toContain("MCP_SERVER_URL=http://localhost:8787");
+  });
+
+  it("writes a shared-token Workers project when the backend uses a bearer secret", () => {
+    const bearer = generateMcp(variant((m) => (m.backend!.auth = { type: "bearer", secret: "BACKEND_TOKEN" })));
+    const pkg = JSON.parse(file(bearer, "package.json"));
+    expect(pkg.dependencies).toEqual({ "@modelcontextprotocol/server": "2.4.0", agents: "0.34.0", zod: "^4.2.0" });
+    expect(file(bearer, "wrangler.jsonc")).toContain('"compatibility_flags": [\n    "nodejs_compat"\n  ]');
+    expect(file(bearer, "wrangler.jsonc")).not.toContain("OAUTH_KV");
+    expect(bearer.map((f) => f.path)).toContain("src/auth.ts");
+    expect(bearer.map((f) => f.path)).not.toContain("src/oauth.ts");
+    expect(file(bearer, "src/index.ts")).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    expect(file(bearer, ".dev.vars.example")).toContain("MCP_ACCESS_TOKEN=");
+    expect(file(bearer, "README.md")).toContain('`{"type": "oauth", ...}`');
   });
 });

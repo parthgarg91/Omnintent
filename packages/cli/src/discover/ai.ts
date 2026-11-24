@@ -7,6 +7,7 @@
 
 import type {
   Action,
+  BackendAuth,
   Entity,
   EntityProperty,
   Manifest,
@@ -154,7 +155,7 @@ export interface ConversionBase {
   slug: string;
   version?: string;
   baseUrl: string;
-  auth: { type: "none" } | { type: "bearer"; secret: string };
+  auth: BackendAuth;
   android?: { packageName: string };
 }
 

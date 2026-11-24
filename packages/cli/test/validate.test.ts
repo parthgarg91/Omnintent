@@ -132,6 +132,21 @@ describe("validate", () => {
     expect(rules(variant((m) => (m.skills![0].actions = ["nope"])))).toContain("error:OI162");
   });
 
+  it("checks OAuth backend settings (OI174, OI175)", () => {
+    const oauth = (auth: Record<string, unknown>) =>
+      variant((m) => {
+        m.backend!.auth = { type: "oauth", authorizationUrl: "https://api.example.com/oauth/authorize", tokenUrl: "https://api.example.com/oauth/token", userInfoPath: "/me", ...auth } as never;
+      });
+    expect(rules(oauth({}))).toEqual([]);
+    expect(rules(oauth({ tokenUrl: "<YOUR_TOKEN_URL>" }))).toEqual(["warning:OI174"]);
+    expect(rules(oauth({ authorizationUrl: "ftp://example.com" }))).toEqual(["error:OI174"]);
+    expect(rules(oauth({ tokenUrl: "http://api.example.com/token" }))).toEqual(["error:OI175"]);
+    expect(rules(oauth({ tokenUrl: "http://127.0.0.1:8788/token" }))).toEqual([]);
+    // userInfoPath is required, and secrets cannot go in the manifest.
+    expect(validateManifest(oauth({ userInfoPath: undefined })).ok).toBe(false);
+    expect(validateManifest(oauth({ clientSecret: "s3cret" })).ok).toBe(false);
+  });
+
   it("exits non-zero from the CLI on an invalid manifest", () => {
     const cli = resolve(REPO, "packages/cli/dist/cli.js");
     expect(execFileSync("node", [cli, "validate", EXAMPLE_MANIFEST]).toString()).toMatch(/is valid: 6 actions, 2 entities/);

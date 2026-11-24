@@ -6,6 +6,37 @@ A remote MCP server for Cloudflare Workers. It exposes each action in `omnintent
 over Streamable HTTP at `/mcp` and forwards every call to your existing backend. It speaks MCP
 revision 2026-07-28 (stateless) and still serves 2025-era clients through the SDK's stateless fallback.
 
+Each person signs in with their own account. Tool calls reach your backend with that person's own
+token, never a shared one.
+
+## How sign-in works
+
+1. An MCP client (Claude, ChatGPT, ...) calls `/mcp` without a token. The server answers `401` and points
+   it at `/.well-known/oauth-protected-resource/mcp` (RFC 9728), which names this server as the
+   authorization server.
+2. The client registers, with a Client ID Metadata Document or Dynamic Client Registration, and opens
+   `/authorize` in the browser.
+3. A consent page shows which app is asking, where access will be sent, and what it may do: **See your
+   data** (`mcp:read`, always) and **Make changes for you** (`mcp:write`, can be unticked).
+4. After **Allow**, the person signs in to your backend's own OAuth server (authorization code + PKCE).
+   The server looks them up at `/me` and stores their backend token, encrypted, in KV.
+5. The client receives its own access token, valid only for this server's `/mcp` (RFC 8707 audience).
+   That token is never sent to your backend, and the backend token is never sent to the client.
+
+When the backend token is close to expiring, the server refreshes it as the client refreshes its own
+token. If the backend refuses the refresh, the grant is revoked and the person signs in again.
+
+## Set up your backend
+
+Register this server as an OAuth client at your backend, with the redirect URI
+`<MCP_SERVER_URL>/oauth/callback`. Your backend needs:
+
+- an authorization endpoint (`BACKEND_OAUTH_AUTHORIZATION_URL`, now `http://localhost:8788/oauth/authorize`) that accepts PKCE (S256);
+- a token endpoint (`BACKEND_OAUTH_TOKEN_URL`, now `http://localhost:8788/oauth/token`) for the `authorization_code` and, ideally,
+  `refresh_token` grants, with `client_secret_basic` client authentication;
+- `GET /me`, which returns the signed-in user with a stable ID at `/id`;
+- the scopes `todo`.
+
 ## Run locally
 
 ```sh
@@ -14,33 +45,51 @@ cp .dev.vars.example .dev.vars   # then fill in the values
 npm run dev                      # wrangler dev, serves http://localhost:8787/mcp
 ```
 
-Without wrangler, the same handler runs on Node.js 22.18+:
+Without wrangler, the same handler runs on Node.js 22.18+, with KV in memory:
 
 ```sh
-BACKEND_BASE_URL=http://localhost:8788 BACKEND_TOKEN=<TOKEN> ALLOW_UNAUTHENTICATED=true npm run start:node
+PORT=8787 MCP_SERVER_URL=http://127.0.0.1:8787 BACKEND_OAUTH_CLIENT_ID=<ID> BACKEND_OAUTH_CLIENT_SECRET=<SECRET> npm run start:node
 ```
+
+Give MCP clients the same address as `MCP_SERVER_URL` (here `http://127.0.0.1:8787/mcp`): tokens are
+only valid for that exact URL.
 
 ## Configuration
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
+| `MCP_SERVER_URL` | var | This server's public origin, with no path, for example the `workers.dev` URL or your own domain. Sign-in refuses to start without it. |
 | `BACKEND_BASE_URL` | var | Base URL of your backend. Defaults to the manifest's `backend.baseUrl`. |
-| `BACKEND_TOKEN` | secret | Sent to your backend as `Authorization: Bearer ...`. |
-| `MCP_ACCESS_TOKEN` | secret | Clients must send `Authorization: Bearer <token>` to `/mcp`. |
-| `ALLOW_UNAUTHENTICATED` | var | Set to `true` to skip the check above. Local development only. |
+| `BACKEND_OAUTH_AUTHORIZATION_URL` | var | Your backend's OAuth authorization endpoint. |
+| `BACKEND_OAUTH_TOKEN_URL` | var | Your backend's OAuth token endpoint. |
+| `BACKEND_OAUTH_CLIENT_ID` | secret | The client ID your backend gave this server. |
+| `BACKEND_OAUTH_CLIENT_SECRET` | secret | The matching client secret. |
+| `CONSENT_SECRET` | secret | Optional, 32+ characters. Remembers each browser's consent for 30 days. |
+| `OAUTH_KV` | KV binding | Grants, tokens (stored as hashes) and encrypted backend tokens. |
 
-Deploy with `npm run deploy` after `wrangler secret put` for each secret.
+## Deploy
+
+```sh
+npx wrangler kv namespace create OAUTH_KV   # put the printed id in wrangler.jsonc
+npx wrangler secret put BACKEND_OAUTH_CLIENT_ID
+npx wrangler secret put BACKEND_OAUTH_CLIENT_SECRET
+npm run deploy
+```
+
+Then set `MCP_SERVER_URL` to the deployed origin (for example `https://todo-example-mcp.<YOUR_SUBDOMAIN>.workers.dev`) as a variable in
+`wrangler.jsonc` or the Cloudflare dashboard, deploy again, and add `<MCP_SERVER_URL>/oauth/callback` as a
+redirect URI at your backend.
 
 ## Tools
 
-| Tool | Safety | Annotations | Confirmation | Backend |
-| --- | --- | --- | --- | --- |
-| `list_lists` | read | readOnly, idempotent | no | `GET /lists` |
-| `add_item` | write | none | no | `POST /lists/{listId}/items` |
-| `list_items` | read | readOnly, idempotent | no | `GET /lists/{listId}/items` |
-| `complete_item` | write | idempotent | no | `POST /items/{itemId}/complete` |
-| `delete_item` | destructive | destructive, idempotent | elicit-or-host | `DELETE /items/{itemId}` |
-| `share_list` | write | openWorld | elicit-or-host | `POST /lists/{listId}/share` |
+| Tool | Safety | Annotations | Confirmation | Scope | Backend |
+| --- | --- | --- | --- | --- | --- |
+| `list_lists` | read | readOnly, idempotent | no | `mcp:read` | `GET /lists` |
+| `add_item` | write | none | no | `mcp:write` | `POST /lists/{listId}/items` |
+| `list_items` | read | readOnly, idempotent | no | `mcp:read` | `GET /lists/{listId}/items` |
+| `complete_item` | write | idempotent | no | `mcp:write` | `POST /items/{itemId}/complete` |
+| `delete_item` | destructive | destructive, idempotent | elicit-or-host | `mcp:write` | `DELETE /items/{itemId}` |
+| `share_list` | write | openWorld | elicit-or-host | `mcp:write` | `POST /lists/{listId}/share` |
 
 - Input arguments are validated against each tool's JSON Schema before your backend is called.
 - Results are cut down to the fields in the tool's output schema, so internal and sensitive fields never
@@ -48,20 +97,10 @@ Deploy with `npm run deploy` after `wrangler secret put` for each secret.
 - Confirmation: on MCP 2026-07-28 the server asks the user through elicitation (an `input_required`
   result) when the client supports it. Otherwise destructive tools rely on the host's own confirmation,
   which `destructiveHint` requests, and payment tools refuse to run.
-
-## Authentication: what this is and is not
-
-`MCP_ACCESS_TOKEN` is a pre-shared API key. It suits clients that let a user paste an API key or header
-(for example Meta Muse custom connectors). It is not MCP OAuth, and every caller acts as the single backend
-account behind `BACKEND_TOKEN`. For per-user access, the next step is OAuth 2.1 with PKCE as the MCP
-authorization spec requires: protect `/mcp` with `OAuthResourceServer` and run an `OAuthAuthorizationServer`
-from `@cloudflare/workers-oauth-provider`, publish Protected Resource Metadata (RFC 9728), call
-`completeAuthorization()` after your own consent screen, read the user's identity with
-`getMcpAuthContext()` inside tools, and exchange it for a per-user backend token. Omnintent v0.1 does not
-generate this yet.
+- A token without `mcp:write` can list and call read tools only. Other tools answer `403`
+  `insufficient_scope`, so the client can ask the person for more access.
 
 ## Connect a client
 
-After `wrangler deploy`, the endpoint is `https://todo-example-mcp.<YOUR_SUBDOMAIN>.workers.dev/mcp`.
-Hosts that accept a custom MCP server URL (Claude, ChatGPT developer mode, Gemini Spark, Meta Muse)
-can use it; hosts that only support OAuth need the upgrade above.
+Add `<MCP_SERVER_URL>/mcp` as a custom MCP server or connector in the host. The host opens the sign-in
+page itself; there is no key to paste.

@@ -29,7 +29,7 @@
 | Model and rules | `packages/cli/src/manifest.ts`, `safety.ts`, `schema.ts` | Types, the safety table (one source of truth for every generator), and schema projections such as the agent-visible properties and MCP schemas. |
 | Validator | `packages/cli/src/validate.ts` | Ajv (2020-12) structure check, then semantic rules with stable IDs. |
 | Generators | `packages/cli/src/generators/` | Pure functions from manifest to file list. They are deterministic and covered by golden-file tests. |
-| MCP runtime | `generators/mcp-runtime.ts` | The server code written into every generated Worker: tool registration, confirmation by elicitation, backend proxy, output projection and inbound auth. |
+| MCP runtime | `generators/mcp-runtime.ts` | The server code written into every generated Worker: tool registration, confirmation by elicitation, backend proxy, output projection, and inbound auth: a shared token, or per-user OAuth 2.1 sign-in (consent page, backend sign-in, scopes, token refresh) through `@cloudflare/workers-oauth-provider`. |
 | Discovery | `packages/cli/src/discover/` | An OpenAPI drafter (deterministic), a codebase summariser, and the Claude path (a closed proposal schema converted, validated and repaired). |
 | Test command | `packages/cli/src/testcmd.ts` | Static utterance checks and test-plan export. |
 | Tester agent | `packages/cli/src/agents/` | `omnintent agent-test`: Claude plays the agent against the tools a host sees (live MCP server or manifest projection) and the tester reports the action and arguments it chose. Also the Siri and Android device plans and result import. |

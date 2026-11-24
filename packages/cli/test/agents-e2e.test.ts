@@ -4,12 +4,15 @@
 // and no write ever reaches the backend.
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { exampleCases } from "../src/agents/tester/cases.js";
 import { runAgentTest, runAttempt } from "../src/agents/tester/run.js";
 import { mcpServerSurface, overlaySurface, type Surface } from "../src/agents/tester/surfaces.js";
-import { EXAMPLE_DIR, GENERATED_DIR, loadExample, variant } from "./helpers.js";
+import { writeFiles } from "../src/generators/index.js";
+import { generateMcp } from "../src/generators/mcp.js";
+import { EXAMPLE_DIR, REPO, loadExample, variant } from "./helpers.js";
 import { fakeModel, reply, text, toolUse, turnOf, utteranceOf } from "./agents-helpers.js";
 
 const procs: ChildProcess[] = [];
@@ -47,13 +50,19 @@ describe("tester agent against the generated MCP server", () => {
   let live: Surface;
   const state = async () => (await (await fetch(`${backend}/__state`)).json()) as { items: { id: string; done: boolean }[]; shares: unknown[] };
 
+  // The example signs people in with OAuth; the tester uses the shared-token variant so it
+  // can connect without a browser sign-in. The tools and descriptions are the same.
+  const serverDir = resolve(REPO, "packages/cli/test/.tmp-tester");
+
   beforeAll(async () => {
+    rmSync(serverDir, { recursive: true, force: true });
+    writeFiles(serverDir, generateMcp(variant((m) => (m.backend!.auth = { type: "bearer", secret: "BACKEND_TOKEN" }))));
     backend = (await start("node", [join(EXAMPLE_DIR, "mock-backend/server.mjs")], EXAMPLE_DIR, { PORT: "0", MOCK_BACKEND_TOKEN: BACKEND_TOKEN }, /listening on (http:\/\/127\.0\.0\.1:\d+)/))[1];
     url = (
       await start(
         "node",
         ["scripts/serve-node.mjs"],
-        join(GENERATED_DIR, "mcp"),
+        serverDir,
         { PORT: "0", BACKEND_BASE_URL: backend, BACKEND_TOKEN, MCP_ACCESS_TOKEN: MCP_TOKEN },
         /listening on (http:\/\/127\.0\.0\.1:\d+\/mcp)/,
       )
@@ -63,6 +72,7 @@ describe("tester agent against the generated MCP server", () => {
 
   afterAll(async () => {
     await live?.close();
+    rmSync(serverDir, { recursive: true, force: true });
   });
 
   it("sees the tools a host sees and only treats reads as callable", () => {

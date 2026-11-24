@@ -239,7 +239,7 @@ Derived levels, strictest wins:
   only raise it.
 
 Android AppFunctions have no per-function authentication setting; the app enforces its own checks
-in its handlers. MCP servers authenticate at the server level (section E.4).
+in its handlers. MCP servers authenticate at the server level (sections E.4 and E.5).
 
 ---
 
@@ -414,14 +414,69 @@ Per action: `"backend": { "method": "POST", "path": "/lists/{listId}/items", "qu
   "Not found", and 400 or 422 says the backend rejected the arguments.
 - The server sends `Authorization: Bearer <secret>` when `auth.type` is `bearer`. The secret lives in
   the server's environment, never in the manifest. `BACKEND_BASE_URL` overrides `baseUrl` at runtime.
-- **Inbound authentication.** v0.1 servers accept a pre-shared token: clients send
-  `Authorization: Bearer <MCP_ACCESS_TOKEN>`. Without that secret, the server refuses every request
-  unless `ALLOW_UNAUTHENTICATED=true`, which is meant for local development only. This is an API key,
-  not MCP OAuth, and every caller acts as one backend account. Per-user access requires OAuth 2.1
-  with PKCE and Protected Resource Metadata (RFC 9728), as the MCP authorization spec requires; it is
-  planned, not generated, in v0.1.
+- **Inbound authentication** depends on `backend.auth.type`:
+  - `none` or `bearer`: a pre-shared token. Clients send `Authorization: Bearer <MCP_ACCESS_TOKEN>`.
+    Without that secret, the server refuses every request unless `ALLOW_UNAUTHENTICATED=true`, which
+    is meant for local development only. This is an API key, not MCP OAuth, and every caller acts as
+    one backend account.
+  - `oauth`: per-user sign-in with OAuth 2.1 (section E.5).
 - Transport: Streamable HTTP at `/mcp`, MCP revision 2026-07-28 (stateless), with stateless
   fallback for 2025-era clients.
+
+### E.5 Per-user sign-in (OAuth)
+
+```json
+"backend": {
+  "baseUrl": "https://api.example.com",
+  "auth": {
+    "type": "oauth",
+    "authorizationUrl": "https://api.example.com/oauth/authorize",
+    "tokenUrl": "https://api.example.com/oauth/token",
+    "userInfoPath": "/me",
+    "userIdPointer": "/id",
+    "scopes": ["todo"],
+    "tokenAuthMethod": "client_secret_basic"
+  }
+}
+```
+
+Use it when the backend has its own OAuth 2.x server. The generated server is then an OAuth 2.1
+authorization server for MCP clients, and an OAuth client of the backend. It follows the MCP
+authorization spec (revision 2026-07-28) through `@cloudflare/workers-oauth-provider`.
+
+- `authorizationUrl` and `tokenUrl` are the backend's endpoints (or placeholders, OI174). They MUST
+  use `https`, except on `localhost` (OI175). `BACKEND_OAUTH_AUTHORIZATION_URL` and
+  `BACKEND_OAUTH_TOKEN_URL` override them at runtime.
+- `userInfoPath` returns the signed-in user; `userIdPointer` (RFC 6901, default `/id`) finds a stable
+  user ID in it. `scopes` are requested from the backend. `tokenAuthMethod` defaults to
+  `client_secret_basic`.
+- The client ID and secret are Worker secrets (`BACKEND_OAUTH_CLIENT_ID`,
+  `BACKEND_OAUTH_CLIENT_SECRET`), never manifest values. The schema rejects other fields.
+- The server's own origin is `MCP_SERVER_URL`, a runtime variable. The manifest holds no hostname of
+  the MCP server. The backend redirect URI is `<MCP_SERVER_URL>/oauth/callback`.
+
+The generated server MUST:
+
+1. Answer requests to `/mcp` without a valid token with `401` and a `WWW-Authenticate` challenge
+   whose `resource_metadata` points to its Protected Resource Metadata (RFC 9728) at
+   `/.well-known/oauth-protected-resource/mcp`. That document names the server's own origin as the
+   authorization server, whose RFC 8414 metadata is at `/.well-known/oauth-authorization-server`.
+2. Accept Client ID Metadata Documents, and Dynamic Client Registration for older clients.
+3. Require PKCE with S256 from MCP clients, and use PKCE with S256 towards the backend.
+4. Show a consent page before any redirect to the backend. It names the client (escaped), marks
+   unverified names, shows the redirect URI's host, warns when it is a local app, and cannot be
+   framed or forged. The person can deny.
+5. Bind every access token to the resource `<MCP_SERVER_URL>/mcp` (RFC 8707) and refuse tokens for
+   another audience.
+6. Never pass tokens through: the MCP client's token is never sent to the backend, and the backend
+   token is never returned to the client. The backend token is stored encrypted with the grant.
+7. Call the backend with the signed-in person's own token.
+8. Grant `mcp:read` for read tools and `mcp:write` for all other tools. `mcp:read` is the scope the
+   `401` asks for. The consent page grants both by default; the person can untick `mcp:write`. A
+   `tools/call` without the needed scope gets `403` `insufficient_scope` naming both scopes.
+9. Keep MCP access tokens no longer-lived than the backend token. When the client refreshes its token
+   and the backend token is about to expire, refresh it too. If the backend refuses the refresh,
+   revoke the grant (`invalid_grant`), so the client signs in again.
 
 ---
 
@@ -526,4 +581,6 @@ destructive action on Android), the case passes only if the agent makes no write
 | OI171 | warning | `app.android.packageName` is set. |
 | OI172 | warning | `backend.baseUrl` is a placeholder. |
 | OI173 | error | `backend.baseUrl` is an http(s) URL or a placeholder. |
+| OI174 | error/warning | OAuth `authorizationUrl` and `tokenUrl` are http(s) URLs (error) or placeholders (warning). |
+| OI175 | error | OAuth `authorizationUrl` and `tokenUrl` use https, except on localhost. |
 | T001–T005 | see section F | Sample utterance checks. |

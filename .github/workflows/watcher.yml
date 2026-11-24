@@ -25,9 +25,11 @@ on:
 permissions:
   contents: read
 
+# Pull request dry runs replace each other. Real runs (schedule, manual) are never cancelled
+# halfway, because they open issues and push a snapshot branch.
 concurrency:
-  group: watcher-${{ github.ref }}
-  cancel-in-progress: true
+  group: watcher-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   watch:

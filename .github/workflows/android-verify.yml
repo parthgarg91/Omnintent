@@ -41,8 +41,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
-
+      # The runner image ships the Android SDK with licenses accepted
+      # (ANDROID_HOME). The Android Gradle Plugin downloads the compileSdk
+      # platform it needs.
       - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "9.9.2"

@@ -1,0 +1,47 @@
+# Android build check
+
+This folder builds the Kotlin that Omnintent generates against the real
+`androidx.appfunctions` 1.0.0 library and its KSP compiler. The unit tests only compile the
+generated code against hand-written stubs; this check proves the real compiler accepts it.
+
+It runs on GitHub Actions (`.github/workflows/android-verify.yml`) whenever the generator,
+the test fixtures or this folder change.
+
+## What it builds
+
+`prepare.mjs` writes one Android app module per manifest into `modules/` (not committed):
+
+| Module | Manifest | Why |
+| --- | --- | --- |
+| `todo` | `examples/todo/omnintent.json` | The example, exactly as developers see it. |
+| `optin` | The example with `delete_item` and `share_list` opted in | `isEnabled = false`, `Unit` returns, `Uri` results. |
+| `fieldnotes` | `packages/cli/test/fixtures/field-notes.json` | Every parameter and result type: nullable scalars, defaults, `Long`, `Double`, `Instant`, `LocalDate`, `Uri`, primitive arrays, lists, enums. |
+| `coffee` | `packages/cli/test/fixtures/coffee-shop.json` | A payment-only app, so no function reaches Android. |
+
+Each module contains the generated `src/` unchanged, an `AndroidManifest.xml` built around the
+generated snippet, the test handlers from `packages/cli/test/fixtures/kotlin-impl`, and a small
+`Application` class that provides them.
+
+`check.mjs` then confirms that KSP generated each concrete service class and a schema XML that
+lists every function, and prints the example's schema XML.
+
+## Run it yourself
+
+You need Node.js 22, JDK 17 or later, the Android SDK (Android Studio installs it; set
+`ANDROID_HOME`), and Gradle 9.
+
+```sh
+npm ci && npm run build
+node verify/android/prepare.mjs
+gradle -p verify/android assembleDebug
+node verify/android/check.mjs
+```
+
+Versions under test are pinned in `build.gradle.kts`: Android Gradle Plugin 9.5.1, Kotlin
+2.4.21, KSP 2.3.13. The AppFunctions version comes from the generator.
+
+## What it does not check
+
+It builds the apps but does not install them. Whether the functions register on a device
+(`adb shell cmd app_function list-app-functions`) and whether Gemini calls them still needs an
+Android 16 device or emulator.

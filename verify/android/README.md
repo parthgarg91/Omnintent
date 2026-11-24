@@ -39,8 +39,21 @@ node verify/android/check.mjs
 Versions under test are pinned in `build.gradle.kts`: Android Gradle Plugin 9.5.1, Kotlin
 2.4.21, KSP 2.3.13. The AppFunctions version comes from the generator.
 
+## On an emulator
+
+The workflow's `device` job installs the APKs on an Android 17 (API 37) emulator and runs
+`device-check.sh`, which lists the registered functions and calls them with
+`adb shell cmd app_function execute-app-function`. To run it yourself, start an API 37 emulator,
+build as above, then:
+
+```sh
+sh verify/android/device-check.sh
+```
+
+An Android 16 QPR2 (API 36.1) emulator job also runs, for information only: on that image the system
+does not index the functions. See `docs/LIMITATIONS.md`.
+
 ## What it does not check
 
-It builds the apps but does not install them. Whether the functions register on a device
-(`adb shell cmd app_function list-app-functions`) and whether Gemini calls them still needs an
-Android 16 device or emulator.
+Real agents. Whether Gemini chooses and calls these functions needs the Connected Apps Platform
+developer preview.

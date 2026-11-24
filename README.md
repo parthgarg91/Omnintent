@@ -60,14 +60,16 @@ BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run 
 # MCP endpoint: http://127.0.0.1:8787/mcp
 ```
 
-Run everything (build, type checks, 79 tests including end-to-end MCP on Node and workerd):
+Run everything (build, type checks, 81 tests including end-to-end MCP on Node and workerd):
 
 ```sh
 npm test
 ```
 
 The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlinc.sh` downloads it
-from GitHub releases into `.tools/`.
+from GitHub releases into `.tools/`. That check uses stubs; `verify/android` builds the generated Kotlin
+with the real AppFunctions compiler and runs it on an Android emulator (on GitHub Actions, or locally
+with the Android SDK; see its README).
 
 ## Commands
 
@@ -85,6 +87,7 @@ SPEC.md                        Omnintent Rule Book v0.1 (the open standard)
 schema/omnintent.schema.json   JSON Schema for omnintent.json
 packages/cli/                  The omnintent CLI (TypeScript)
 examples/todo/                 Example manifest, OpenAPI file, mock backend, generated output
+verify/android/                Builds generated Kotlin with the real AppFunctions compiler
 docs/RESEARCH.md               Platform research with sources (November 2026)
 docs/ARCHITECTURE.md           Components and the agentic roadmap
 docs/LIMITATIONS.md            What is and is not verified

@@ -10,6 +10,8 @@ omnintent generate omnintent.json --target all --out generated
 omnintent discover openapi.yaml --out omnintent.json
 omnintent test omnintent.json --plan test-plan
 omnintent agent-test omnintent.json --server <your-staging-mcp-url> --runs 3 --report agent-report.md
+omnintent watch --report watch-report.md          # run from the repository root
+omnintent submit-prep omnintent.json --out submission
 ```
 
 Environment:

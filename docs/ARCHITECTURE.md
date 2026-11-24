@@ -33,6 +33,8 @@
 | Discovery | `packages/cli/src/discover/` | An OpenAPI drafter (deterministic), a codebase summariser, and the Claude path (a closed proposal schema converted, validated and repaired). |
 | Test command | `packages/cli/src/testcmd.ts` | Static utterance checks and test-plan export. |
 | Tester agent | `packages/cli/src/agents/` | `omnintent agent-test`: Claude plays the agent against the tools a host sees (live MCP server or manifest projection) and the tester reports the action and arguments it chose. Also the Siri and Android device plans and result import. |
+| Watcher agent | `packages/cli/src/agents/watch/` | Source list, extractors (npm, Jetpack release notes, MCP revision, Markdown sections) and the report. |
+| Submission helper | `packages/cli/src/agents/submit/` | Store and host drafts from a manifest, reading the same safety table as the generators. |
 
 Design choices:
 
@@ -78,11 +80,17 @@ deploy, publish or submit on its own.
    tester. *Human gate:* the developer approves manifest diffs; descriptions are product copy.
    The optimizer is part of the hosted Omnintent service and is not in this repository. It builds
    on the open tester: anyone can run `agent-test` and edit descriptions by hand.
-5. **Watcher agent.** Tracks platform changes, such as Siri AI preview API changes, AppFunctions
-   releases, MCP revisions and host connector requirements. It opens issues or pull requests against
-   the rule book and generators, citing sources, the way `docs/RESEARCH.md` does. *Human gate:*
-   maintainers review spec changes.
-6. **Submission helper.** Prepares, but does not send:
+5. **Watcher agent** (v0.1: `omnintent watch`, `.github/workflows/watcher.yml`). Tracks platform
+   changes: the Siri AI Developer Preview and App Intents pages, AppFunctions releases and guides,
+   the MCP specification's latest revision and key pages, and the npm versions of the MCP SDK and
+   Cloudflare packages (`packages/cli/src/agents/watch/sources.ts`). Version facts are read out of
+   `docs/RESEARCH.md` itself and compared with the live value; pages are compared section by section
+   with the last snapshot (`docs/watch-state.json`). Every Monday the workflow opens one issue
+   listing what moved, with links and the files to re-check, and a pull request that updates the
+   snapshot. It does not interpret changes or edit the rule book, generators or `RESEARCH.md`.
+   *Human gate:* maintainers read the sources and make spec changes.
+6. **Submission helper** (v0.1: `omnintent submit-prep`). Prepares, but does not send (it has no
+   network code):
    - App Store and TestFlight notes (remembering that Siri AI preview features only reach internal
      testers).
    - Google Connected Console entries for Gemini (an Android MCP connected app and tester lists).

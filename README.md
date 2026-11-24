@@ -66,7 +66,7 @@ BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run 
 # MCP endpoint: http://127.0.0.1:8787/mcp
 ```
 
-Run everything (build, type checks, 107 tests including end-to-end MCP on Node and workerd):
+Run everything (build, type checks, 141 tests including end-to-end MCP on Node and workerd):
 
 ```sh
 npm test
@@ -84,6 +84,8 @@ from GitHub releases into `.tools/`.
 | `omnintent discover <openapi-file\|dir> [--out omnintent.json] [--no-ai] [--model <id>]` | Drafts a manifest. It never writes an invalid one. |
 | `omnintent test <manifest> [--plan <dir>]` | Utterance checks, plus test plans for SiriEvaluations, adb and MCP. |
 | `omnintent agent-test <manifest> [--server <url>] [--platform mcp\|ios\|android] [--runs <n>]` | Claude plays the agent; reports the action and arguments it chose for each sample. `--import` reads results recorded on Siri or Android. |
+| `omnintent watch [--update-state] [--report <file>]` | Watcher agent: checks Apple, Android, MCP and Cloudflare sources against `docs/RESEARCH.md` and reports what moved. Runs weekly in GitHub Actions and opens an issue. |
+| `omnintent submit-prep <manifest> --out <dir>` | Submission helper: drafts TestFlight notes, a Google Connected Console entry and an MCP connector listing. It never sends anything. |
 
 ## Repository
 
@@ -95,6 +97,8 @@ examples/todo/                 Example manifest, OpenAPI file, mock backend, gen
 docs/RESEARCH.md               Platform research with sources (November 2026)
 docs/ARCHITECTURE.md           Components and the agentic roadmap
 docs/LIMITATIONS.md            What is and is not verified
+docs/watch-state.json          The watcher agent's last snapshot of the sources it tracks
+.github/workflows/watcher.yml  Weekly watcher run that opens issues and snapshot pull requests
 ```
 
 ## Safety in one table

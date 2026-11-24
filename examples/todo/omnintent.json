@@ -12,7 +12,13 @@
   },
   "backend": {
     "baseUrl": "http://localhost:8788",
-    "auth": { "type": "bearer", "secret": "BACKEND_TOKEN" },
+    "auth": {
+      "type": "oauth",
+      "authorizationUrl": "http://localhost:8788/oauth/authorize",
+      "tokenUrl": "http://localhost:8788/oauth/token",
+      "userInfoPath": "/me",
+      "scopes": ["todo"]
+    },
     "timeoutMs": 10000
   },
   "entities": {

@@ -49,7 +49,24 @@ export interface AppDefinition {
   instructions: string;
   backend: {
     baseUrl: string;
-    auth: { type: "none" } | { type: "bearer"; secret: string };
+    auth: { type: "none" } | { type: "bearer"; secret: string } | BackendOAuth;
     timeoutMs: number;
   };
+}
+
+/** Per-user sign-in through the backend's own OAuth server (SPEC.md, section E.5). */
+export interface BackendOAuth {
+  type: "oauth";
+  authorizationUrl: string;
+  tokenUrl: string;
+  userInfoPath: string;
+  userIdPointer: string;
+  scopes: string[];
+  tokenAuthMethod: "client_secret_basic" | "client_secret_post" | "none";
+}
+
+/** Who is calling, after OAuth sign-in. Never sent to an MCP client. */
+export interface UserCredentials {
+  /** The signed-in user's own backend access token. */
+  backendToken: string;
 }

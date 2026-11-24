@@ -27,6 +27,13 @@ describe("discover from OpenAPI (deterministic)", () => {
     expect(notes.join(" ")).toMatch(/Sample utterances were templated/);
   });
 
+  it("points APIs that use OAuth to per-user sign-in", () => {
+    const doc = structuredClone(loadOpenApi(OPENAPI)) as { components: { securitySchemes: Record<string, unknown> } };
+    doc.components.securitySchemes.oauth = { type: "oauth2", flows: {} };
+    expect(draftFromOpenApi(doc as never).notes.join(" ")).toMatch(/section E\.5/);
+    expect(notes.join(" ")).not.toMatch(/section E\.5/);
+  });
+
   it("names actions from operationIds and derives safety from HTTP methods", () => {
     const summary = Object.fromEntries(manifest.actions.map((a) => [a.name, a.safety]));
     expect(summary).toEqual({

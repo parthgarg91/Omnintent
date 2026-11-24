@@ -53,14 +53,20 @@ node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all
 # Draft a manifest from an OpenAPI file (set ANTHROPIC_API_KEY to let Claude refine it).
 node packages/cli/dist/cli.js discover examples/todo/openapi.yaml --out /tmp/omnintent.json
 
-# Run the generated MCP server against the mock backend.
-PORT=8788 MOCK_BACKEND_TOKEN=dev node examples/todo/mock-backend/server.mjs &
+# Run the generated MCP server against the mock backend, which has its own sign-in page.
+PORT=8788 node examples/todo/mock-backend/server.mjs &
 cd examples/todo/generated/mcp
-BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run dev (wrangler)
-# MCP endpoint: http://127.0.0.1:8787/mcp
+PORT=8787 MCP_SERVER_URL=http://127.0.0.1:8787 BACKEND_OAUTH_CLIENT_ID=todo-mcp \
+  BACKEND_OAUTH_CLIENT_SECRET=todo-mcp-secret npm run start:node   # or: npm run dev (wrangler)
+# MCP endpoint: http://127.0.0.1:8787/mcp. An MCP client that supports OAuth opens a consent
+# page, then the mock sign-in (any user name works). Each user gets their own to-do lists.
 ```
 
-Run everything (build, type checks, 79 tests including end-to-end MCP on Node and workerd):
+The example signs each person in with OAuth 2.1 (SPEC.md section E.5). A backend without its own
+OAuth server can use one shared token instead (section E.4).
+
+Run everything (build, type checks, 92 tests including end-to-end MCP with OAuth sign-in on Node and
+workerd):
 
 ```sh
 npm test

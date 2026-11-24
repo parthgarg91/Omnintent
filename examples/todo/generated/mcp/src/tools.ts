@@ -9,8 +9,15 @@ export const APP: AppDefinition = {
   "backend": {
     "baseUrl": "http://localhost:8788",
     "auth": {
-      "type": "bearer",
-      "secret": "BACKEND_TOKEN"
+      "type": "oauth",
+      "authorizationUrl": "http://localhost:8788/oauth/authorize",
+      "tokenUrl": "http://localhost:8788/oauth/token",
+      "userInfoPath": "/me",
+      "userIdPointer": "/id",
+      "scopes": [
+        "todo"
+      ],
+      "tokenAuthMethod": "client_secret_basic"
     },
     "timeoutMs": 10000
   }

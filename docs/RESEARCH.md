@@ -217,6 +217,24 @@ Apple documentation pages are fetched as Markdown by appending `.md` to the URL.
   - Never log or return upstream tokens.
 - npm on the same day: `agents` 0.34.0 (peers: `@modelcontextprotocol/server` 2.4.0), `wrangler`
   4.167.0, `@cloudflare/workers-types` 5.20261124.1, `@cloudflare/workers-oauth-provider` 1.3.0.
+- **`@cloudflare/workers-oauth-provider` 1.3.0** (npm, published November 23, 2026; read from its
+  README, `docs/` and type declarations in the package):
+  - Two shapes: split `OAuthAuthorizationServer` + `OAuthResourceServer` (recommended for several
+    resources) and the combined `OAuthProvider` (one Worker that is both). Omnintent uses the
+    combined one: one Worker, one deploy.
+  - `resourceMetadata.resource` must be an absolute URL (`http` only on loopback), fixed when the
+    provider is built. The provider publishes RFC 9728 metadata at
+    `/.well-known/oauth-protected-resource/<path>`, sends the `401` challenge, and binds every token
+    to that one resource (RFC 8707).
+  - Consent helpers: `describeConsent`, `beginConsent`, `approveConsent`, `denyConsent`,
+    `isConsentRemembered`. Third-party sign-in: `beginUpstream` (only after consent) and
+    `finishUpstream`. The consent page itself is the application's, and must escape client data.
+  - `requiredScopes` is advertised, not enforced; `insufficientScope()` builds the `403` step-up.
+  - `tokenExchangeCallback` can refresh an upstream token and set `accessTokenTTL`; throwing
+    `invalid_grant` revokes the grant.
+  - CIMD needs `clientIdMetadataDocumentEnabled` and the `global_fetch_strictly_public` flag. DCR is
+    deprecated in MCP 2026-07-28 but still supported. A KV namespace bound as `OAUTH_KV` is required.
+  - The package imports `cloudflare:workers`, so the Node adapter stubs that module.
 
 ## Anthropic API (for `omnintent discover`)
 

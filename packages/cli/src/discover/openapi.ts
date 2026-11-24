@@ -84,6 +84,9 @@ export function draftFromOpenApi(doc: Obj): Draft {
   const apiKey = schemes.some((s) => isObj(s) && s.type === "apiKey");
   if (apiKey && !bearer) notes.push("The API uses an API-key header; v0.1 MCP servers send only Authorization: Bearer. Adjust the backend or the generated server.");
   const auth = bearer || apiKey ? ({ type: "bearer", secret: "BACKEND_TOKEN" } as const) : ({ type: "none" } as const);
+  if (schemes.some((s) => isObj(s) && (s.type === "oauth2" || s.type === "openIdConnect"))) {
+    notes.push('The API uses OAuth. For per-user sign-in, set backend.auth to {"type": "oauth", ...} (SPEC.md, section E.5); the draft uses one shared bearer token.');
+  }
 
   // Entities from component schemas used in responses
   const schemas = (isObj(components.schemas) ? components.schemas : {}) as Obj;

@@ -1,7 +1,12 @@
 # Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+# This server's own origin: wrangler dev serves http://localhost:8787.
+MCP_SERVER_URL=http://localhost:8787
 BACKEND_BASE_URL=http://localhost:8788
-BACKEND_TOKEN=<YOUR_BACKEND_TOKEN>
-# Either require a token from MCP clients...
-MCP_ACCESS_TOKEN=<A_LONG_RANDOM_STRING>
-# ...or, for local development only, allow unauthenticated requests:
-# ALLOW_UNAUTHENTICATED=true
+BACKEND_OAUTH_AUTHORIZATION_URL=http://localhost:8788/oauth/authorize
+BACKEND_OAUTH_TOKEN_URL=http://localhost:8788/oauth/token
+# The OAuth client this server is registered as at your backend. Its redirect URI is
+# <MCP_SERVER_URL>/oauth/callback.
+BACKEND_OAUTH_CLIENT_ID=<YOUR_CLIENT_ID>
+BACKEND_OAUTH_CLIENT_SECRET=<YOUR_CLIENT_SECRET>
+# Optional: 32+ random characters to remember each user's consent for 30 days.
+# CONSENT_SECRET=<A_LONG_RANDOM_STRING>

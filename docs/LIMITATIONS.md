@@ -18,6 +18,8 @@ network policy.
 | Kotlin | `kotlinc` 2.4.21 (from GitHub releases) compiles the generated code for three manifests, plus handler implementations, against hand-written **stubs** of the AppFunctions and Android APIs (`packages/cli/test/fixtures/kotlin-stubs`) | Compiles. |
 | Swift | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
+| Builder agent | 34 tests against a **fake** streaming Messages API and a **fake** GitHub API: request shape (`claude-opus-5-5`, adaptive thinking, effort `high`, structured output, `fallbacks: "default"`), SSE parsing (split chunks, fallback blocks, refusals, stream errors), proposal checks (paths, file types, coverage, missing methods), the repair loop, one draft pull request per platform, Git Data API call sequence, refusing writes outside its branch prefix, not rebuilding or reopening, stale-file removal, dry runs and the CLI | Pass. |
+| Builder agent on real GitHub | `omnintent build` against the public `parthgarg91/Omnintent` repository from this container | The read calls worked (branch lookup, base commit). Creating the branch was refused by this environment's proxy (403 on `POST /git/trees`), so no real pull request was opened. |
 | Watcher agent | 21 tests against a **fake** web: RESEARCH.md baselines are read from the real file, newer npm/AppFunctions/MCP versions are flagged, changed/added/removed page sections are named, unreadable sources keep their snapshot, the fingerprint is stable, and no real network is used | Pass. |
 | Watcher, live run | `omnintent watch` from this container on November 24, 2026: 18 of 20 sources read and matched `RESEARCH.md`; two runs in a row gave identical page hashes. The two Cloudflare docs pages are blocked by this container's network policy | 18 of 20 read. |
 | Submission helper | 13 tests: every draft file, internal-TestFlight-only wording, Apple's 4,000-byte App Review notes limit, Android exposure matching the safety table, MCP annotations and withheld fields, warnings, and that it works with `fetch` disabled | Pass. |
@@ -33,7 +35,7 @@ The 7 end-to-end checks run on each runtime:
 6. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
 7. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 113 tests across 7 files (`npm test`).
+Total: 147 tests across 8 files (`npm test`; one is skipped when a tool is missing).
 
 ## Not verified
 
@@ -98,6 +100,27 @@ Total: 113 tests across 7 files (`npm test`).
   `output_config.format`); the quality of real proposals is unmeasured.
 - Codebase discovery without an OpenAPI file depends on Claude. The route detection that feeds it is
   a set of regular expressions for common web frameworks.
+
+### Builder agent
+
+- **Never called the real Anthropic API** (no key here). The streaming request follows the Claude
+  API documentation as of November 24, 2026; whether the real API accepts every field together
+  (structured output, adaptive thinking, effort, server-side fallbacks, streaming) is untested.
+- **Never opened a real pull request.** The GitHub write path (`git/trees`, `git/commits`,
+  `git/refs`, `pulls`) ran only against a fake; this container's proxy blocks those calls on
+  github.com. The read calls worked against the real repository.
+- **The quality of AI-written glue is unmeasured.** The agent checks paths, file types, coverage
+  and that every handler method name appears, but it does not compile Swift or Kotlin or run the
+  backend. Wrong types, wrong signatures or wrong business logic can pass these checks; the
+  pull request checklist asks a person to build and test.
+- The MCP "already present" status is the model's claim from reading the backend code; the agent
+  does not call the routes.
+- Only about 240 KB of the most relevant source files is sent per platform, ranked by file names.
+  In a large app the right files can be missed; the model is told to write a marked stub instead
+  of guessing, but that is not guaranteed.
+- No shared agent runtime yet: the builder has its own small streaming client
+  (`packages/cli/src/builder/claude.ts`). The tester, optimizer and watcher agents may want to
+  share it.
 
 ### Watcher agent
 

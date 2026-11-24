@@ -265,7 +265,7 @@ export function appFunctionsValue(value: unknown, schema: { type: string; format
   }
   if (schema.format === "date-time") {
     const ms = Date.parse(value);
-    return Number.isNaN(ms) ? value : { epochSecond: Math.floor(ms / 1000), nano: (((ms % 1000) + 1000) % 1000) * 1_000_000 };
+    return Number.isNaN(ms) ? value : { epochSecond: Math.floor(ms / 1000), nanoAdjustment: (((ms % 1000) + 1000) % 1000) * 1_000_000 };
   }
   if (schema.format === "uri") return { uri: value };
   return value;

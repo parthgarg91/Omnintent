@@ -86,8 +86,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: ["36.1", "37.0"]
+        include:
+          - api-level: "37.0"
+            informational: false
+          # On the Android 16 QPR2 google_apis image the system does not index the
+          # functions (see docs/LIMITATIONS.md). Kept to notice when that changes.
+          - api-level: "36.1"
+            informational: true
     name: device (API ${{ matrix.api-level }})
+    continue-on-error: ${{ matrix.informational }}
     steps:
       - uses: actions/checkout@v5
 

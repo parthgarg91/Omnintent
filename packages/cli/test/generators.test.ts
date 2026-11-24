@@ -172,7 +172,7 @@ describe("kotlin generator", () => {
 
   it("writes date, date-time and URI examples as the objects AppFunctions expects", () => {
     expect(appFunctionsValue("2027-04-15", { type: "string", format: "date" })).toEqual({ year: 2027, month: 4, dayOfMonth: 15 });
-    expect(appFunctionsValue("2026-11-24T12:00:00.250Z", { type: "string", format: "date-time" })).toEqual({ epochSecond: 1795521600, nano: 250_000_000 });
+    expect(appFunctionsValue("2026-11-24T12:00:00.250Z", { type: "string", format: "date-time" })).toEqual({ epochSecond: 1795521600, nanoAdjustment: 250_000_000 });
     expect(appFunctionsValue(["https://a.example"], { type: "array", items: { type: "string", format: "uri" } })).toEqual([{ uri: "https://a.example" }]);
     expect(appFunctionsValue("milk", { type: "string" })).toBe("milk");
     const service = file(files, `${dir}/BaseTodoExampleAppFunctionService.kt`);

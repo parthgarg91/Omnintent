@@ -1,0 +1,227 @@
+openapi: 3.1.0
+info:
+  title: Todo Example
+  version: 1.0.0
+  description: A personal to-do app with named lists of items that can be added, completed, deleted and shared.
+servers:
+  - url: http://localhost:8788
+security:
+  - bearerAuth: []
+paths:
+  /lists:
+    get:
+      operationId: listLists
+      summary: List to-do lists
+      description: Lists the user's to-do lists with their IDs, names and number of open items.
+      responses:
+        "200":
+          description: The lists.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoList"
+  /lists/{listId}/items:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        description: The ID of the list, for example "groceries".
+        schema:
+          type: string
+        example: groceries
+    get:
+      operationId: listItems
+      summary: List items
+      description: Lists the items on a to-do list, optionally filtered to open or done items.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Which items to return. Defaults to open.
+          schema:
+            type: string
+            enum: [open, done, all]
+            default: open
+      responses:
+        "200":
+          description: The items.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: addItem
+      summary: Add item
+      description: Adds a new item to a to-do list and returns the created item.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: What needs to be done.
+                  example: Buy milk
+                dueDate:
+                  type: string
+                  format: date
+                  description: The day the item is due.
+      responses:
+        "201":
+          description: The created item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /items/{itemId}/complete:
+    post:
+      operationId: completeItem
+      summary: Complete item
+      description: Marks a to-do item as done and returns the updated item.
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "200":
+          description: The updated item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /items/{itemId}:
+    delete:
+      operationId: deleteItem
+      summary: Delete item
+      description: Deletes a to-do item permanently.
+      parameters:
+        - $ref: "#/components/parameters/ItemId"
+      responses:
+        "204":
+          description: Deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /lists/{listId}/share:
+    post:
+      operationId: shareList
+      summary: Share list
+      description: Shares a to-do list with another person by email and returns the share link.
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          description: The ID of the list to share.
+          schema:
+            type: string
+          example: groceries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: The email address of the person to share the list with.
+                  example: sam@example.com
+      responses:
+        "200":
+          description: The share link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResult"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      description: The ID of the item.
+      schema:
+        type: string
+      example: item-1
+  responses:
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    TodoList:
+      type: object
+      description: A named list that groups to-do items.
+      required: [id, name, openCount]
+      properties:
+        id:
+          type: string
+          description: The unique ID of the list.
+        name:
+          type: string
+          description: The name the user gave the list.
+        openCount:
+          type: integer
+          minimum: 0
+          description: How many items on the list are not done yet.
+    TodoItem:
+      type: object
+      description: One task on a to-do list.
+      required: [id, listId, title, done]
+      properties:
+        id:
+          type: string
+          description: The unique ID of the item.
+        listId:
+          type: string
+          description: The ID of the list that holds the item.
+        title:
+          type: string
+          description: What needs to be done.
+        done:
+          type: boolean
+          description: Whether the item has been completed.
+        dueDate:
+          type: [string, "null"]
+          format: date
+          description: The day the item is due, if any.
+        notes:
+          type: string
+          description: Private notes the app keeps for its own use.
+    ShareResult:
+      type: object
+      required: [shareUrl, sharedWith]
+      properties:
+        shareUrl:
+          type: string
+          format: uri
+          description: The link the other person can open.
+        sharedWith:
+          type: string
+          format: email
+          description: The email address the list was shared with.
+    Error:
+      type: object
+      properties:
+        message:
+          type: string

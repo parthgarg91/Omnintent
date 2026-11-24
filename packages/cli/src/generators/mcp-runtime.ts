@@ -1,0 +1,367 @@
+// Static runtime files for the generated MCP server. They do not depend on the
+// manifest; src/tools.ts carries everything manifest-specific. Kept as strings
+// so the CLI can write them anywhere without reading package assets.
+
+import { HEADER } from "./types.js";
+
+export const TYPES_TS = `// ${HEADER}
+
+export type JsonSchema = {
+  type?: string;
+  title?: string;
+  description?: string;
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  required?: string[];
+  [keyword: string]: unknown;
+};
+
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
+export interface ToolDefinition {
+  name: string;
+  title: string;
+  description: string;
+  safety: "read" | "write" | "destructive" | "payment";
+  inputSchema: JsonSchema;
+  outputSchema?: JsonSchema;
+  /** "list" results are wrapped as {"items": [...]} for clients older than MCP 2026-07-28. */
+  outputKind: "none" | "entity" | "list" | "object";
+  annotations: ToolAnnotations;
+  /**
+   * elicit-or-host: ask the user through MCP elicitation when the client supports it,
+   * otherwise rely on the host's own confirmation (requested by destructiveHint).
+   * elicit-required: ask through elicitation, refuse when the client cannot.
+   */
+  confirmation?: { mode: "elicit-or-host" | "elicit-required"; prompt: string };
+  backend: {
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string;
+    pathParams: string[];
+    query: string[];
+    body: string[];
+    resultPointer?: string;
+  };
+}
+
+export interface AppDefinition {
+  name: string;
+  version: string;
+  instructions: string;
+  backend: {
+    baseUrl: string;
+    auth: { type: "none" } | { type: "bearer"; secret: string };
+    timeoutMs: number;
+  };
+}
+`;
+
+export const SERVER_TS = `// ${HEADER}
+//
+// Builds one MCP server per request (stateless, MCP 2026-07-28) and proxies each
+// tool call to the developer's backend. Runs unchanged on Cloudflare Workers and
+// on Node.js 22.18+.
+
+import {
+  CLIENT_CAPABILITIES_META_KEY,
+  McpServer,
+  fromJsonSchema,
+  inputRequired,
+  inputResponse,
+  type CallToolResult,
+  type ElicitRequestFormParams,
+  type InputRequiredResult,
+  type ServerContext,
+} from "@modelcontextprotocol/server";
+import { APP, TOOLS } from "./tools.ts";
+import type { JsonSchema, ToolDefinition } from "./types.ts";
+
+/** Worker bindings and variables. Secrets and vars are both plain strings at runtime. */
+export type Env = Record<string, unknown>;
+
+type Args = Record<string, unknown>;
+
+const CONFIRM_KEY = "omnintent_confirm";
+
+const CONFIRM_SCHEMA: ElicitRequestFormParams["requestedSchema"] = {
+  type: "object",
+  properties: {
+    confirm: { type: "boolean", title: "Confirm", description: "Allow this action to run." },
+  },
+  required: ["confirm"],
+};
+
+export function createServer(env: Env, fetchImpl: typeof fetch = fetch): McpServer {
+  const server = new McpServer(
+    { name: APP.name, version: APP.version },
+    { instructions: APP.instructions },
+  );
+  for (const tool of TOOLS) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: fromJsonSchema<Args>(tool.inputSchema),
+        outputSchema: tool.outputSchema ? fromJsonSchema(tool.outputSchema) : undefined,
+        annotations: { title: tool.title, ...tool.annotations },
+      },
+      async (args: Args, ctx: ServerContext) => {
+        const gate = tool.confirmation ? confirmationGate(tool, args, ctx) : undefined;
+        if (gate) return gate;
+        return callBackend(tool, args, env, fetchImpl);
+      },
+    );
+  }
+  return server;
+}
+
+// ---------------------------------------------------------------- confirmation
+
+function confirmationGate(
+  tool: ToolDefinition,
+  args: Args,
+  ctx: ServerContext,
+): CallToolResult | InputRequiredResult | undefined {
+  const confirmation = tool.confirmation!;
+  const answer = inputResponse(ctx.mcpReq.inputResponses, CONFIRM_KEY);
+  if (answer.kind === "elicit") {
+    if (answer.action === "accept" && answer.content?.confirm === true) return undefined;
+    return toolError(\`The user did not confirm "\${tool.title}", so nothing was changed.\`);
+  }
+  if (clientCanElicit(ctx)) {
+    return inputRequired({
+      inputRequests: {
+        [CONFIRM_KEY]: inputRequired.elicit({
+          mode: "form",
+          message: fillPrompt(confirmation.prompt, args),
+          requestedSchema: CONFIRM_SCHEMA,
+        }),
+      },
+    });
+  }
+  if (confirmation.mode === "elicit-required") {
+    return toolError(
+      \`"\${tool.title}" needs the user's confirmation, and this client cannot ask for it. Nothing was changed.\`,
+    );
+  }
+  // The client cannot elicit: the host's own confirmation applies (destructiveHint is set).
+  return undefined;
+}
+
+/** On MCP 2026-07-28 every request declares the client's capabilities. */
+function clientCanElicit(ctx: ServerContext): boolean {
+  const envelope = ctx.mcpReq.envelope as Record<string, unknown> | undefined;
+  const capabilities = envelope?.[CLIENT_CAPABILITIES_META_KEY] as { elicitation?: unknown } | undefined;
+  return capabilities?.elicitation !== undefined && capabilities.elicitation !== null;
+}
+
+function fillPrompt(template: string, args: Args): string {
+  return template.replace(/\\{([^}]+)\\}/g, (_, name: string) => {
+    const value = args[name];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
+// ---------------------------------------------------------------- backend proxy
+
+function backendBaseUrl(env: Env): string | undefined {
+  const fromEnv = typeof env.BACKEND_BASE_URL === "string" ? env.BACKEND_BASE_URL : "";
+  const value = fromEnv || APP.backend.baseUrl;
+  return /^https?:\\/\\//.test(value) ? value.replace(/\\/+$/, "") : undefined;
+}
+
+async function callBackend(tool: ToolDefinition, args: Args, env: Env, fetchImpl: typeof fetch): Promise<CallToolResult> {
+  const base = backendBaseUrl(env);
+  if (!base) return toolError("The server is not configured yet: set BACKEND_BASE_URL to the backend's URL.");
+
+  let path = tool.backend.path;
+  for (const name of tool.backend.pathParams) {
+    path = path.replace(\`{\${name}}\`, encodeURIComponent(String(args[name])));
+  }
+  const url = new URL(base + path);
+  for (const name of tool.backend.query) {
+    const value = args[name];
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) for (const item of value) url.searchParams.append(name, String(item));
+    else url.searchParams.set(name, String(value));
+  }
+
+  const headers: Record<string, string> = { accept: "application/json" };
+  let body: string | undefined;
+  if (tool.backend.body.length) {
+    const payload: Args = {};
+    for (const name of tool.backend.body) if (args[name] !== undefined) payload[name] = args[name];
+    body = JSON.stringify(payload);
+    headers["content-type"] = "application/json";
+  }
+  const auth = APP.backend.auth;
+  if (auth.type === "bearer") {
+    const token = env[auth.secret];
+    if (typeof token !== "string" || !token) {
+      return toolError(\`The server is not configured yet: set the \${auth.secret} secret.\`);
+    }
+    headers.authorization = \`Bearer \${token}\`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      method: tool.backend.method,
+      headers,
+      body,
+      signal: AbortSignal.timeout(APP.backend.timeoutMs),
+    });
+  } catch (err) {
+    return toolError(\`Could not reach the backend for "\${tool.title}": \${err instanceof Error ? err.message : String(err)}\`);
+  }
+  const text = await response.text();
+  if (!response.ok) return toolError(describeFailure(response.status, text));
+  if (!tool.outputSchema) return { content: [{ type: "text", text: \`\${tool.title}: done.\` }] };
+
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    return toolError("The backend returned a response that is not JSON.");
+  }
+  if (tool.backend.resultPointer) data = jsonPointer(data, tool.backend.resultPointer);
+  const shaped =
+    tool.outputKind === "list"
+      ? { items: project(tool.outputSchema.properties!.items!, data ?? []) }
+      : project(tool.outputSchema, data);
+  return {
+    content: [{ type: "text", text: JSON.stringify(shaped) }],
+    structuredContent: shaped as Record<string, unknown>,
+  };
+}
+
+/**
+ * Keeps only the fields the output schema declares, so internal or sensitive
+ * fields the backend returns never reach an agent. Nulls are dropped.
+ */
+export function project(schema: JsonSchema, value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+  if (schema.type === "object" && schema.properties && isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, propSchema] of Object.entries(schema.properties)) {
+      const projected = project(propSchema, value[key]);
+      if (projected !== undefined) out[key] = projected;
+    }
+    return out;
+  }
+  if (schema.type === "array" && schema.items && Array.isArray(value)) {
+    return value.map((item) => project(schema.items!, item)).filter((item) => item !== undefined);
+  }
+  return value;
+}
+
+function jsonPointer(value: unknown, pointer: string): unknown {
+  if (pointer === "" || pointer === "/") return value;
+  let current = value;
+  for (const raw of pointer.slice(1).split("/")) {
+    const key = raw.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (Array.isArray(current)) current = current[Number(key)];
+    else if (isRecord(current)) current = current[key];
+    else return undefined;
+  }
+  return current;
+}
+
+function describeFailure(status: number, text: string): string {
+  let detail = text.trim();
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (isRecord(parsed)) {
+      const message = parsed.message ?? parsed.error ?? parsed.detail;
+      if (typeof message === "string") detail = message;
+    }
+  } catch {
+    // Not JSON; use the text as is.
+  }
+  detail = detail.slice(0, 300);
+  if (status === 404) return \`Not found (404)\${detail ? \`: \${detail}\` : "."}\`;
+  if (status === 400 || status === 422) return \`The backend rejected the arguments (\${status})\${detail ? \`: \${detail}\` : "."}\`;
+  if (status === 401 || status === 403) return \`The backend refused the request (\${status}). Check the server's backend credentials.\`;
+  if (status === 409) return \`The request conflicts with the current state (409)\${detail ? \`: \${detail}\` : "."}\`;
+  return \`The backend failed (\${status})\${detail ? \`: \${detail}\` : "."}\`;
+}
+
+function toolError(message: string): CallToolResult {
+  return { content: [{ type: "text", text: message }], isError: true };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+`;
+
+export const AUTH_TS = `// ${HEADER}
+//
+// Inbound access control for the MCP endpoint. This is a pre-shared bearer
+// token (an API key), not MCP OAuth. See README.md for the OAuth upgrade path.
+
+import type { Env } from "./server.ts";
+
+export function checkInboundAuth(request: Request, env: Env): Response | undefined {
+  const expected = typeof env.MCP_ACCESS_TOKEN === "string" ? env.MCP_ACCESS_TOKEN : "";
+  if (expected) {
+    const header = request.headers.get("authorization") ?? "";
+    const presented = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
+    if (presented && constantTimeEqual(presented, expected)) return undefined;
+    return unauthorized("A valid bearer token is required.");
+  }
+  if (env.ALLOW_UNAUTHENTICATED === "true") return undefined;
+  return unauthorized(
+    "This server has no MCP_ACCESS_TOKEN. Set that secret, or set ALLOW_UNAUTHENTICATED=true for local development only.",
+  );
+}
+
+function unauthorized(message: string): Response {
+  return new Response(JSON.stringify({ error: "unauthorized", message }), {
+    status: 401,
+    headers: { "content-type": "application/json", "www-authenticate": 'Bearer realm="mcp"' },
+  });
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const left = new TextEncoder().encode(a);
+  const right = new TextEncoder().encode(b);
+  let diff = left.length ^ right.length;
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    diff |= (left[i] ?? 0) ^ (right[i] ?? 0);
+  }
+  return diff === 0;
+}
+`;
+
+export const INDEX_TS = `// ${HEADER}
+//
+// Cloudflare Worker entry point. Serves MCP over Streamable HTTP at /mcp using
+// the Agents SDK's stateless createMcpHandler (MCP 2026-07-28, with the SDK's
+// stateless fallback for 2025-era clients).
+
+import { createMcpHandler } from "agents/mcp/server";
+import { checkInboundAuth } from "./auth.ts";
+import { createServer, type Env } from "./server.ts";
+import { APP } from "./tools.ts";
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const { pathname } = new URL(request.url);
+    if (pathname === "/") return Response.json({ name: APP.name, mcp: "/mcp" });
+    if (pathname !== "/mcp") return new Response("Not found", { status: 404 });
+    if (request.method !== "OPTIONS") {
+      const denied = checkInboundAuth(request, env);
+      if (denied) return denied;
+    }
+    const handler = createMcpHandler(() => createServer(env), { route: "/mcp" });
+    return handler(request, env, ctx);
+  },
+} satisfies ExportedHandler<Env>;
+`;

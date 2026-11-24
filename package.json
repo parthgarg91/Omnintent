@@ -1,0 +1,29 @@
+{
+  "name": "omnintent-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Omnintent: describe your app's actions once, generate Siri App Intents, Android AppFunctions, and a remote MCP server.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/cli",
+    "examples/todo/generated/mcp"
+  ],
+  "scripts": {
+    "build": "npm run build -w omnintent",
+    "typecheck": "npm run typecheck -w omnintent && npm run typecheck -w todo-example-mcp",
+    "test": "npm run build && npm run typecheck && vitest run",
+    "generate:example": "node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all --out examples/todo/generated",
+    "validate:example": "node packages/cli/dist/cli.js validate examples/todo/omnintent.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-swift": "^0.7.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

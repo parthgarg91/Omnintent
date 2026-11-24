@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:omnintent:manifest:0.1",
+  "title": "Omnintent manifest (omnintent.json), version 0.1",
+  "description": "Describes an app's actions once so that tools can generate Siri App Intents, Android AppFunctions and MCP tools. See SPEC.md (Omnintent Rule Book v0.1). This schema checks structure only; the rule book adds semantic rules (OI-xxx) that `omnintent validate` enforces.",
+  "type": "object",
+  "required": ["omnintent", "app", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "omnintent": {
+      "description": "Version of the rule book this manifest follows.",
+      "const": "0.1"
+    },
+    "app": { "$ref": "#/$defs/app" },
+    "backend": { "$ref": "#/$defs/backend" },
+    "entities": {
+      "description": "Things the app knows about, keyed by PascalCase entity name. Each entity is a JSON Schema object with Omnintent keywords.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Z][A-Za-z0-9]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/entity" }
+    },
+    "actions": {
+      "description": "Things an agent can do in the app. Each action becomes one MCP tool, one Siri tool intent and one Android AppFunction (subject to safety rules).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "skills": {
+      "description": "Optional multi-step guidance that ties several actions together.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/skill" }
+    }
+  },
+  "$defs": {
+    "nonEmptyText": { "type": "string", "minLength": 1 },
+    "authLevel": {
+      "description": "Who must be present before the action runs or data is shown. none: no check; authenticated: the user must be authenticated (device unlocked); local-device: the user must unlock the device that runs the action.",
+      "enum": ["none", "authenticated", "local-device"]
+    },
+    "privacy": {
+      "description": "public: safe to show anyone. personal: the user's own data. sensitive: financial, health, credentials or similar; never sent to cloud agents or Android agents.",
+      "enum": ["public", "personal", "sensitive"]
+    },
+    "app": {
+      "type": "object",
+      "required": ["name", "slug", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "slug": {
+          "description": "Lowercase identifier used for package and worker names.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,48}[a-z0-9]$"
+        },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+([-+].*)?$" },
+        "description": { "type": "string", "minLength": 10, "maxLength": 1024 },
+        "instructions": {
+          "description": "App-level guidance for agents: domain, how actions relate, cross-action constraints. Becomes MCP server instructions and the Android appfn:instructions attribute.",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "ios": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bundleId": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" }
+          }
+        },
+        "android": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName"],
+          "properties": {
+            "packageName": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" }
+          }
+        }
+      }
+    },
+    "backend": {
+      "description": "The developer's existing HTTP API that the generated MCP server proxies to.",
+      "type": "object",
+      "required": ["baseUrl"],
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": {
+          "description": "Base URL, or a placeholder such as <YOUR_BACKEND_URL>. The MCP server reads BACKEND_BASE_URL at runtime and falls back to this value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "auth": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type"],
+              "additionalProperties": false,
+              "properties": { "type": { "const": "none" } }
+            },
+            {
+              "type": "object",
+              "required": ["type", "secret"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "bearer" },
+                "secret": {
+                  "description": "Name of the Worker secret that holds the token, e.g. BACKEND_TOKEN.",
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]*$"
+                }
+              }
+            }
+          ]
+        },
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 30000 }
+      }
+    },
+    "scalarType": { "enum": ["string", "integer", "number", "boolean"] },
+    "valueSchemaCommon": {
+      "description": "Keywords shared by parameter and property schemas. A deliberate subset of JSON Schema 2020-12 that maps onto Swift, Kotlin and MCP.",
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["string", "integer", "number", "boolean", "array"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "format": { "enum": ["date", "date-time", "uri", "email", "int64"] },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "items": {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "$ref": "#/$defs/scalarType" },
+            "format": { "enum": ["date", "date-time", "uri", "email", "int64"] },
+            "enum": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+            "description": { "type": "string" }
+          }
+        },
+        "default": {},
+        "examples": { "type": "array" },
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 0 },
+        "minItems": { "type": "integer", "minimum": 0 },
+        "maxItems": { "type": "integer", "minimum": 0 },
+        "pattern": { "type": "string" }
+      },
+      "required": ["type", "description"]
+    },
+    "parameterSchema": {
+      "description": "One input parameter of an action.",
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/valueSchemaCommon" }],
+      "unevaluatedProperties": false,
+      "properties": {
+        "x-omnintent-entity": {
+          "description": "Marks a string parameter as the ID of an entity. Siri receives the entity itself; MCP and Android receive the ID string.",
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]{0,63}$"
+        }
+      }
+    },
+    "entityProperty": {
+      "description": "One property of an entity.",
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/valueSchemaCommon" }],
+      "unevaluatedProperties": false,
+      "properties": {
+        "privacy": { "$ref": "#/$defs/privacy" },
+        "visibility": {
+          "description": "internal: the app may use it, agents never see it.",
+          "enum": ["public", "internal"]
+        },
+        "authentication": { "$ref": "#/$defs/authLevel" }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["type", "title", "description", "idProperty", "displayProperty", "properties"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "object" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "privacy": { "$ref": "#/$defs/privacy" },
+        "authentication": { "$ref": "#/$defs/authLevel" },
+        "idProperty": { "type": "string", "minLength": 1 },
+        "displayProperty": { "type": "string", "minLength": 1 },
+        "properties": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
+          "additionalProperties": { "$ref": "#/$defs/entityProperty" }
+        },
+        "required": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    },
+    "entityRef": {
+      "type": "object",
+      "required": ["$ref"],
+      "additionalProperties": false,
+      "properties": {
+        "$ref": { "type": "string", "pattern": "^#/entities/[A-Z][A-Za-z0-9]{0,63}$" }
+      }
+    },
+    "inputSchema": {
+      "description": "JSON Schema (2020-12) for the action's arguments. Always an object; MCP's inputSchema is this value with x-omnintent-* keywords removed.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "object" },
+        "properties": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
+          "additionalProperties": { "$ref": "#/$defs/parameterSchema" }
+        },
+        "required": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "additionalProperties": { "const": false }
+      }
+    },
+    "outputSchema": {
+      "description": "What the action returns: one entity, a list of entities, or a small object of scalar fields. Omit when the action returns nothing useful.",
+      "oneOf": [
+        { "$ref": "#/$defs/entityRef" },
+        {
+          "type": "object",
+          "required": ["type", "items"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "array" },
+            "items": { "$ref": "#/$defs/entityRef" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "properties"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "object" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "properties": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
+              "additionalProperties": { "$ref": "#/$defs/entityProperty" }
+            },
+            "required": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "actionBackend": {
+      "description": "How the MCP server calls the developer's backend for this action.",
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "path": {
+          "description": "Path template appended to the base URL. {name} is replaced with the URL-encoded argument of that name.",
+          "type": "string",
+          "pattern": "^/"
+        },
+        "query": {
+          "description": "Arguments sent as query parameters. Default: every non-path argument for GET and DELETE, none otherwise.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "body": {
+          "description": "Arguments sent as JSON body fields. Default: every non-path, non-query argument for POST, PUT and PATCH.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "resultPointer": {
+          "description": "JSON Pointer (RFC 6901) into the response body that holds the result, e.g. /data.",
+          "type": "string",
+          "pattern": "^(/.*)?$"
+        }
+      }
+    },
+    "example": {
+      "type": "object",
+      "required": ["utterance", "arguments"],
+      "additionalProperties": false,
+      "properties": {
+        "utterance": { "type": "string", "minLength": 3, "maxLength": 300 },
+        "arguments": { "type": "object" }
+      }
+    },
+    "platformSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "action": {
+      "type": "object",
+      "required": ["name", "title", "description", "safety", "inputSchema", "examples"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "MCP tool name. The rule book requires snake_case.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 1024 },
+        "safety": {
+          "description": "read: no changes. write: creates or changes data, reversible. destructive: deletes or overwrites data, or cannot be undone. payment: moves money or commits the user to a purchase.",
+          "enum": ["read", "write", "destructive", "payment"]
+        },
+        "idempotent": { "type": "boolean" },
+        "openWorld": {
+          "description": "True when the action reaches people or systems outside the app (sends email, posts publicly).",
+          "type": "boolean"
+        },
+        "authentication": { "$ref": "#/$defs/authLevel" },
+        "confirmation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "required": { "type": "boolean" },
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "acceptLabel": { "type": "string", "minLength": 1, "maxLength": 30 }
+          }
+        },
+        "inputSchema": { "$ref": "#/$defs/inputSchema" },
+        "outputSchema": { "$ref": "#/$defs/outputSchema" },
+        "backend": { "$ref": "#/$defs/actionBackend" },
+        "examples": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/example" } },
+        "platforms": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ios": { "$ref": "#/$defs/platformSwitch" },
+            "android": { "$ref": "#/$defs/platformSwitch" },
+            "mcp": { "$ref": "#/$defs/platformSwitch" }
+          }
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "required": ["name", "description", "instructions"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "instructions": { "type": "string", "minLength": 1, "maxLength": 10000 },
+        "actions": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    }
+  }
+}

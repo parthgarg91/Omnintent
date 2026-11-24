@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+BACKEND_BASE_URL=http://localhost:8788
+BACKEND_TOKEN=<YOUR_BACKEND_TOKEN>
+# Either require a token from MCP clients...
+MCP_ACCESS_TOKEN=<A_LONG_RANDOM_STRING>
+# ...or, for local development only, allow unauthenticated requests:
+# ALLOW_UNAUTHENTICATED=true

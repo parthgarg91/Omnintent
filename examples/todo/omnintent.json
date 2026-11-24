@@ -1,0 +1,252 @@
+{
+  "$schema": "../../schema/omnintent.schema.json",
+  "omnintent": "0.1",
+  "app": {
+    "name": "Todo Example",
+    "slug": "todo-example",
+    "version": "1.0.0",
+    "description": "A personal to-do app with named lists of items that can be added, completed, deleted and shared.",
+    "instructions": "This app manages personal to-do lists: listing lists, adding items, listing items, completing items, deleting items and sharing a list by email.\nOperational patterns:\n- Use the list lists action to turn a list name such as \"groceries\" into its listId before acting on a list.\n- Use the list items action to find an itemId before completing or deleting an item.\nConstraints:\n- Item titles are at most 200 characters.",
+    "ios": { "bundleId": "com.example.todoexample" },
+    "android": { "packageName": "com.example.todoexample" }
+  },
+  "backend": {
+    "baseUrl": "http://localhost:8788",
+    "auth": { "type": "bearer", "secret": "BACKEND_TOKEN" },
+    "timeoutMs": 10000
+  },
+  "entities": {
+    "TodoList": {
+      "type": "object",
+      "title": "To-do List",
+      "description": "A named list that groups to-do items, such as Groceries or Work.",
+      "privacy": "personal",
+      "idProperty": "id",
+      "displayProperty": "name",
+      "properties": {
+        "id": { "type": "string", "title": "ID", "description": "The unique ID of the list, for example \"groceries\"." },
+        "name": { "type": "string", "title": "Name", "description": "The name the user gave the list." },
+        "openCount": { "type": "integer", "title": "Open Items", "description": "How many items on the list are not done yet.", "minimum": 0 }
+      },
+      "required": ["id", "name", "openCount"]
+    },
+    "TodoItem": {
+      "type": "object",
+      "title": "To-do Item",
+      "description": "One task on a to-do list.",
+      "privacy": "personal",
+      "idProperty": "id",
+      "displayProperty": "title",
+      "properties": {
+        "id": { "type": "string", "title": "ID", "description": "The unique ID of the item." },
+        "listId": { "type": "string", "title": "List ID", "description": "The ID of the list that holds the item." },
+        "title": { "type": "string", "title": "Title", "description": "What needs to be done, for example \"Buy milk\"." },
+        "done": { "type": "boolean", "title": "Done", "description": "Whether the item has been completed." },
+        "dueDate": { "type": "string", "format": "date", "title": "Due Date", "description": "The day the item is due, if any." },
+        "notes": {
+          "type": "string",
+          "title": "Notes",
+          "description": "Private notes the app keeps for its own use.",
+          "visibility": "internal"
+        }
+      },
+      "required": ["id", "listId", "title", "done"]
+    }
+  },
+  "actions": [
+    {
+      "name": "list_lists",
+      "title": "List To-do Lists",
+      "description": "Lists the user's to-do lists with their IDs, names and number of open items.",
+      "safety": "read",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "outputSchema": { "type": "array", "items": { "$ref": "#/entities/TodoList" } },
+      "backend": { "method": "GET", "path": "/lists" },
+      "examples": [
+        { "utterance": "What to-do lists do I have?", "arguments": {} },
+        { "utterance": "Show my lists", "arguments": {} }
+      ]
+    },
+    {
+      "name": "add_item",
+      "title": "Add Item",
+      "description": "Adds a new item to a to-do list and returns the created item.",
+      "safety": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "title": "List",
+            "description": "The ID of the list to add the item to, for example \"groceries\".",
+            "x-omnintent-entity": "TodoList"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "What needs to be done, for example \"Buy milk\".",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date",
+            "description": "The day the item is due, as YYYY-MM-DD. Omit when the user gives no date."
+          }
+        },
+        "required": ["listId", "title"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/entities/TodoItem" },
+      "backend": { "method": "POST", "path": "/lists/{listId}/items", "body": ["title", "dueDate"] },
+      "examples": [
+        { "utterance": "Add milk to my groceries list", "arguments": { "listId": "groceries", "title": "milk" } },
+        {
+          "utterance": "Put \"file taxes\" on my work list for 2027-04-15",
+          "arguments": { "listId": "work", "title": "file taxes", "dueDate": "2027-04-15" }
+        }
+      ]
+    },
+    {
+      "name": "list_items",
+      "title": "List Items",
+      "description": "Lists the items on a to-do list, optionally filtered to open or done items.",
+      "safety": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "title": "List",
+            "description": "The ID of the list to read, for example \"groceries\".",
+            "x-omnintent-entity": "TodoList"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Which items to return: open, done or all. Defaults to open.",
+            "enum": ["open", "done", "all"],
+            "default": "open"
+          }
+        },
+        "required": ["listId"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "type": "array", "items": { "$ref": "#/entities/TodoItem" } },
+      "backend": { "method": "GET", "path": "/lists/{listId}/items", "query": ["status"] },
+      "examples": [
+        { "utterance": "What's on my groceries list?", "arguments": { "listId": "groceries" } },
+        { "utterance": "Which work items are done?", "arguments": { "listId": "work", "status": "done" } }
+      ]
+    },
+    {
+      "name": "complete_item",
+      "title": "Complete Item",
+      "description": "Marks a to-do item as done and returns the updated item.",
+      "safety": "write",
+      "idempotent": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "title": "Item",
+            "description": "The ID of the item to mark as done.",
+            "x-omnintent-entity": "TodoItem"
+          }
+        },
+        "required": ["itemId"],
+        "additionalProperties": false
+      },
+      "outputSchema": { "$ref": "#/entities/TodoItem" },
+      "backend": { "method": "POST", "path": "/items/{itemId}/complete" },
+      "examples": [
+        { "utterance": "Mark buy milk as done", "arguments": { "itemId": "item-1" } },
+        { "utterance": "I finished sending the report", "arguments": { "itemId": "item-3" } }
+      ]
+    },
+    {
+      "name": "delete_item",
+      "title": "Delete Item",
+      "description": "Deletes a to-do item permanently. The item cannot be restored.",
+      "safety": "destructive",
+      "idempotent": true,
+      "confirmation": { "prompt": "Delete \"{itemId}\" permanently?", "acceptLabel": "Delete" },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "title": "Item",
+            "description": "The ID of the item to delete.",
+            "x-omnintent-entity": "TodoItem"
+          }
+        },
+        "required": ["itemId"],
+        "additionalProperties": false
+      },
+      "backend": { "method": "DELETE", "path": "/items/{itemId}" },
+      "examples": [
+        { "utterance": "Delete the eggs item", "arguments": { "itemId": "item-2" } },
+        { "utterance": "Remove buy milk from my list for good", "arguments": { "itemId": "item-1" } }
+      ]
+    },
+    {
+      "name": "share_list",
+      "title": "Share List",
+      "description": "Shares a to-do list with another person by email and returns the share link.",
+      "safety": "write",
+      "openWorld": true,
+      "confirmation": { "required": true, "prompt": "Share this list with {email}?", "acceptLabel": "Share" },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "title": "List",
+            "description": "The ID of the list to share, for example \"groceries\".",
+            "x-omnintent-entity": "TodoList"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "The email address of the person to share the list with."
+          }
+        },
+        "required": ["listId", "email"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Share Result",
+        "description": "The outcome of sharing a list.",
+        "properties": {
+          "shareUrl": { "type": "string", "format": "uri", "title": "Share Link", "description": "The link the other person can open." },
+          "sharedWith": { "type": "string", "format": "email", "title": "Shared With", "description": "The email address the list was shared with." }
+        },
+        "required": ["shareUrl", "sharedWith"]
+      },
+      "backend": { "method": "POST", "path": "/lists/{listId}/share", "body": ["email"] },
+      "examples": [
+        {
+          "utterance": "Share my groceries list with sam@example.com",
+          "arguments": { "listId": "groceries", "email": "sam@example.com" }
+        },
+        {
+          "utterance": "Send the work list to alex@example.org",
+          "arguments": { "listId": "work", "email": "alex@example.org" }
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "tidy-list",
+      "description": "Reviews one to-do list and helps the user clear out finished or stale items.",
+      "instructions": "Use this when the user wants to clean up or review a list.\n1. Resolve the list name to its ID with the list lists tool.\n2. Read the done items with the list items tool (status done), then the open items.\n3. Summarise what is finished and what is still open.\n4. Offer to delete finished items one at a time. Deleting cannot be undone, so name each item before you delete it.",
+      "actions": ["list_lists", "list_items", "delete_item"]
+    }
+  ]
+}

@@ -38,9 +38,9 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -58,7 +58,7 @@ jobs:
             --update-state \
             --report "$RUNNER_TEMP/watch-report.md" \
             --report-json "$RUNNER_TEMP/watch-report.json" > /dev/null
-          cat "$RUNNER_TEMP/watch-report.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/watch-report.md" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Open an issue when something moved
         if: github.event_name != 'pull_request'

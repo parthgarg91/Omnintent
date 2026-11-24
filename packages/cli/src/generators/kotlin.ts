@@ -11,6 +11,8 @@ import { HEADER, exampleValue, lines, lowerFirst, type GeneratedFile } from "./t
 
 export const APPFUNCTIONS_VERSION = "1.0.0";
 export const KSP_VERSION = "2.3.13";
+/** The generated service switches to Dispatchers.IO; androidx.appfunctions does not expose coroutines to apps. */
+export const COROUTINES_VERSION = "1.11.0";
 
 interface KotlinNames {
   packageName: string;
@@ -37,6 +39,10 @@ export function generateKotlin(manifest: Manifest): GeneratedFile[] {
   const dir = `src/main/kotlin/${names.servicePackage.replace(/\./g, "/")}`;
   const actions = manifest.actions.filter((a) => isEnabledFor(a, "android"));
   const files: GeneratedFile[] = [];
+
+  // The AppFunctions compiler rejects an entry point without functions
+  // ("Class must have at least one AppFunction"), so generate nothing to build.
+  if (!actions.length) return [{ path: "README.md", content: emptyReadme(manifest) }];
 
   for (const [name, entity] of Object.entries(manifest.entities ?? {})) {
     files.push({ path: `${dir}/${name}.kt`, content: dataClassFile(names, name, entity.description, agentVisibleProperties(entity), entity.required ?? []) });
@@ -246,6 +252,30 @@ function handlersFile(manifest: Manifest, names: KotlinNames, actions: Action[])
   ]);
 }
 
+/**
+ * A manifest value as AppFunctions expects it in JSON. LocalDate, Instant and Uri are
+ * objects there, not strings (an emulator rejects "2027-04-15" for a LocalDate).
+ */
+export function appFunctionsValue(value: unknown, schema: { type: string; format?: string; items?: { type: string; format?: string } }): unknown {
+  if (Array.isArray(value)) return schema.items ? value.map((v) => appFunctionsValue(v, schema.items!)) : value;
+  if (typeof value !== "string") return value;
+  if (schema.format === "date") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return m ? { year: Number(m[1]), month: Number(m[2]), dayOfMonth: Number(m[3]) } : value;
+  }
+  if (schema.format === "date-time") {
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? value : { epochSecond: Math.floor(ms / 1000), nanoAdjustment: (((ms % 1000) + 1000) % 1000) * 1_000_000 };
+  }
+  if (schema.format === "uri") return { uri: value };
+  return value;
+}
+
+function appFunctionsArgs(action: Action, args: Record<string, unknown>): Record<string, unknown> {
+  const props = action.inputSchema.properties ?? {};
+  return Object.fromEntries(Object.entries(args).map(([k, v]) => [k, props[k] ? appFunctionsValue(v, props[k]) : v]));
+}
+
 function formatExample(value: unknown): string | undefined {
   return value === undefined ? undefined : JSON.stringify(value);
 }
@@ -274,7 +304,8 @@ function returnDoc(manifest: Manifest, action: Action): string | undefined {
 function functionBlock(manifest: Manifest, action: Action): string[] {
   const params = kParams(action);
   const docs = params.map((p) => {
-    const example = formatExample(exampleValue(p.name, p.schema, action.examples));
+    const raw = exampleValue(p.name, p.schema, action.examples);
+    const example = formatExample(raw === undefined ? undefined : appFunctionsValue(raw, p.schema));
     const d = p.schema.description.toLowerCase();
     const listsValues = p.schema.enum?.every((v) => d.includes(v.toLowerCase()));
     const values = p.schema.enum && !listsValues ? ` One of: ${p.schema.enum.join(", ")}.` : "";
@@ -427,6 +458,8 @@ function gradleSnippet(): string {
     "dependencies {",
     `    implementation("androidx.appfunctions:appfunctions:${APPFUNCTIONS_VERSION}")`,
     `    ksp("androidx.appfunctions:appfunctions-compiler:${APPFUNCTIONS_VERSION}")`,
+    "    // The generated service uses kotlinx.coroutines. Keep your own version if the app already has it.",
+    `    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${COROUTINES_VERSION}")`,
     "}",
   ]);
 }
@@ -486,9 +519,33 @@ function readme(manifest: Manifest, names: KotlinNames, actions: Action[]): stri
   ]);
 }
 
+function emptyReadme(manifest: Manifest): string {
+  return lines([
+    `# ${manifest.app.name}: Android AppFunctions (generated)`,
+    "",
+    HEADER,
+    "",
+    "Nothing was generated for Android: no action in the manifest can be exposed as an AppFunction.",
+    "",
+    ...manifest.actions.map((a) => `- \`${a.name}\` (${a.safety}): ${androidReason(a)}`),
+    "",
+    "AppFunctions give the app no confirmation step, so payment actions are never generated, and",
+    "destructive actions or writes that need confirmation are generated only when the manifest sets",
+    "`platforms.android.enabled: true`. The AppFunctions compiler also rejects a service with no",
+    "functions, so no service, data classes or manifest snippet are written.",
+  ]);
+}
+
+function androidReason(action: Action): string {
+  const rule = androidRule(action);
+  if (rule === "never") return "moves money, so it is never exposed on Android.";
+  if (rule === "opt-in") return "needs confirmation; set `platforms.android.enabled: true` to expose it, disabled until your app enables it.";
+  return "disabled in the manifest (`platforms.android.enabled: false`).";
+}
+
 export function adbExecute(manifest: Manifest, names: KotlinNames, action: Action, args?: Record<string, unknown>): string {
   const pkg = manifest.app.android?.packageName ?? names.packageName;
   const fn = `${names.servicePackage}.${names.baseClass}#${camelCase(action.name)}`;
-  const params = JSON.stringify(args ?? action.examples[0]?.arguments ?? {});
+  const params = JSON.stringify(appFunctionsArgs(action, args ?? action.examples[0]?.arguments ?? {}));
   return `adb shell "cmd app_function execute-app-function --package ${pkg} --function '${fn}' --parameters '${params.replace(/"/g, '\\"')}'"`;
 }

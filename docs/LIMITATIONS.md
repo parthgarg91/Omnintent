@@ -2,7 +2,8 @@
 
 Omnintent v0.1 is experimental. Everything below was checked on November 24, 2026, in a Linux
 container with Node.js 22.23, no Swift toolchain, no Android SDK, and Google Maven blocked by the
-network policy. Per-user OAuth sign-in for the MCP server was added and checked the same day.
+network policy. The Android build and emulator checks ran on GitHub Actions
+(`.github/workflows/android-verify.yml`, Ubuntu 26.04 runners), which can reach Google Maven. Per-user OAuth sign-in for the MCP server was added and checked the same day.
 
 ## Verified by running it
 
@@ -15,7 +16,9 @@ network policy. Per-user OAuth sign-in for the MCP server was added and checked 
 | MCP with OAuth, end to end on Node | Generated `scripts/serve-node.mjs` (the Worker's own `fetch` handler, KV in memory), the example mock backend acting as the app's own OAuth server, the official `@modelcontextprotocol/client` 2.4.0 doing discovery, registration and PKCE, and a scripted browser for the consent and sign-in pages | 11 tests pass (see the list below). |
 | MCP with OAuth, end to end on workerd | The same 11 tests against `wrangler dev` 4.167.0, which runs the Worker in local workerd with local KV | Pass. |
 | MCP with a shared token | A generated payment server (bearer backend): type-checks; refuses requests without the token; refuses to pay without elicitation (2026 and 2025 clients); pays after confirmation; strips `sensitive` fields | Pass. |
-| Kotlin | `kotlinc` 2.4.21 (from GitHub releases) compiles the generated code for three manifests, plus handler implementations, against hand-written **stubs** of the AppFunctions and Android APIs (`packages/cli/test/fixtures/kotlin-stubs`) | Compiles. |
+| Kotlin, stubs | `kotlinc` 2.4.21 compiles the generated code for three manifests, plus handler implementations, against hand-written stubs of the AppFunctions and Android APIs (`packages/cli/test/fixtures/kotlin-stubs`). Fast, runs with `npm test` | Compiles. |
+| Kotlin, real compiler | `verify/android` on GitHub Actions: three generated apps (the example, the example with `delete_item` and `share_list` opted in, and `field-notes.json`, which uses every parameter and result type) built with `assembleDebug` against the real `androidx.appfunctions` 1.0.0 and `appfunctions-compiler` 1.0.0, AGP 9.5.1, Kotlin 2.4.21, KSP 2.3.13, compileSdk 37, minSdk 26. A script then checks KSP generated each service class and a schema XML listing every function | Builds. |
+| Kotlin, on a device | The same APKs installed on an Android 17 (API 37) `google_apis` x86_64 emulator; `adb shell cmd app_function list-app-functions` and `execute-app-function` as the generated README describes (see the list below) | Pass. |
 | Swift | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
 | Builder agent | 34 tests against a **fake** streaming Messages API and a **fake** GitHub API: request shape (`claude-opus-5-5`, adaptive thinking, effort `high`, structured output, `fallbacks: "default"`), SSE parsing (split chunks, fallback blocks, refusals, stream errors), proposal checks (paths, file types, coverage, missing methods), the repair loop, one draft pull request per platform, Git Data API call sequence, refusing writes outside its branch prefix, not rebuilding or reopening, stale-file removal, dry runs and the CLI | Pass. |
@@ -51,7 +54,20 @@ The 11 end-to-end checks run on each runtime:
     access, the refresh fails with `invalid_grant` and the grant's tokens stop working.
 11. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 188 tests across 10 files (`npm test`). 187 passed in this run; the Kotlin compile test was skipped because `kotlinc` was not downloaded this time.
+The emulator checks (`verify/android/device-check.sh`):
+
+1. Every function of the three apps is registered with the system, under the ids the README's adb
+   commands use (`<package>.omnintent.Base<App>AppFunctionService#<function>`).
+2. Functions run and return the handler's data, including `Unit` results.
+3. Omitted optional parameters get the manifest defaults (`Int`, `Long`, `Double`, `Boolean`, enum
+   strings).
+4. Every type decodes when sent as an agent would: nullable scalars, `Long` beyond 32 bits, `LocalDate`,
+   `Instant`, `Uri`, primitive arrays, lists of strings, dates and URIs.
+5. The generated blank-string check reaches the caller as an `AppFunctionException` with the message.
+6. An enum value outside the list is refused by the platform before the app sees it.
+7. Opted-in actions (`isEnabled = false`) are registered and refused until the app enables them.
+
+Total: 190 tests across 10 files (`npm test`), all passing with `kotlinc` present, plus the Android GitHub Actions workflow.
 
 ## Not verified
 
@@ -77,21 +93,26 @@ Total: 188 tests across 10 files (`npm test`). 187 passed in this run; the Kotli
 
 ### Kotlin / Android
 
-- **Compiled only against stubs.** The real `androidx.appfunctions` 1.0.0 library and its KSP
-  processor were not available (Google Maven is blocked here), and there was no Android SDK. The
-  stubs follow the documentation, so the compile proves internal consistency (types, imports,
-  nullability, named arguments, annotation parameter names as documented), not acceptance by the real
-  processor.
-- Unconfirmed against the real processor:
-  - `Unit` returns for actions without output.
-  - `Int?` and other nullable scalar parameters.
-  - `@AppFunctionStringValueConstraint` on a nullable parameter.
-  - Primitive-array parameters.
-  - Default values in `@AppFunctionSerializable` constructors.
-- The manifest snippet values (`app_functions_schema.xsd`, `android.app.appfunctions.v2`,
-  `app_metadata`) and the KSP version (2.3.13, taken from Google's sample) are unconfirmed.
-- Not run on a device: `adb shell cmd app_function …` was not executed, and the Gemini / Connected
-  Apps Platform integration is untested.
+- **Android 16 not confirmed.** Google says AppFunctions works on Android 16 and later. On the
+  Android 16 QPR2 (API 36.1) and Android 16 (API 36) `google_apis` emulator images the system did not
+  index the functions ("App function not found"), and the API 36 image has no `cmd app_function` at
+  all. The manifest snippet matches Google's documentation exactly. Possibly these images predate the
+  platform support, or a Play-updated system module is needed; untested on a real Android 16 phone.
+- **Dates, times and links are objects on Android.** AppFunctions sends `LocalDate` as
+  `{"year", "month", "dayOfMonth"}`, `Instant` as `{"epochSecond", "nanoAdjustment"}` and `Uri` as
+  `{"uri"}`, not as strings. The generated KDoc examples and adb commands use these shapes. Avoid
+  describing a format such as "YYYY-MM-DD" in a parameter's description, because Android agents do not
+  send that string.
+- The platform checks enum values itself, so the generated enum check in the function body only matters
+  for callers that skip the platform.
+- An app whose actions are all excluded from Android (for example payment-only) gets no Kotlin code,
+  because the compiler rejects a service without functions.
+- The KSP version (2.3.13) is the one Google's sample uses with Kotlin 2.4.21. Other Kotlin versions
+  need the matching KSP release; untested.
+- Not tested with Hilt, with the app's own `minSdk` above 26, or in release builds with R8 (shrinking
+  could remove classes AppFunctions reads by reflection; untested).
+- Not tested with a real agent: Gemini and the Connected Apps Platform integration are untested. The
+  emulator run used the `cmd app_function` shell tool, which calls functions directly.
 
 ### MCP / Cloudflare
 

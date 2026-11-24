@@ -20,56 +20,27 @@ export function variant(edit: (m: Manifest) => void): Manifest {
   return m;
 }
 
+export const FIXTURES = resolve(here, "fixtures");
+
+function loadFixture(name: string): Manifest {
+  return JSON.parse(readFileSync(resolve(FIXTURES, name), "utf8")) as Manifest;
+}
+
 /** A small manifest with a payment action, for safety-mapping tests. */
 export function paymentManifest(): Manifest {
-  return {
-    omnintent: "0.1",
-    app: {
-      name: "Coffee Shop",
-      slug: "coffee-shop",
-      description: "Orders coffee for pickup at a nearby store.",
-      android: { packageName: "com.example.coffee" },
-    },
-    backend: { baseUrl: "<YOUR_BACKEND_URL>", auth: { type: "bearer", secret: "BACKEND_TOKEN" } },
-    entities: {
-      Order: {
-        type: "object",
-        title: "Order",
-        description: "A coffee order.",
-        privacy: "personal",
-        idProperty: "id",
-        displayProperty: "summary",
-        properties: {
-          id: { type: "string", description: "The order ID." },
-          summary: { type: "string", description: "What was ordered, for example \"Large latte\"." },
-          cardLast4: { type: "string", description: "The last four digits of the card used.", privacy: "sensitive" },
-        },
-        required: ["id", "summary"],
-      },
-    },
-    actions: [
-      {
-        name: "place_order",
-        title: "Place Order",
-        description: "Places and pays for a coffee order for pickup and returns the order.",
-        safety: "payment",
-        confirmation: { prompt: "Pay for {drink} now?" },
-        inputSchema: {
-          type: "object",
-          properties: {
-            drink: { type: "string", title: "Drink", description: "The drink to order, for example \"latte\"." },
-            size: { type: "string", title: "Size", description: "Cup size.", enum: ["small", "large"], default: "small" },
-          },
-          required: ["drink"],
-          additionalProperties: false,
-        },
-        outputSchema: { $ref: "#/entities/Order" },
-        backend: { method: "POST", path: "/orders" },
-        examples: [
-          { utterance: "Order a latte", arguments: { drink: "latte" } },
-          { utterance: "Get me a large mocha", arguments: { drink: "mocha", size: "large" } },
-        ],
-      },
-    ],
-  };
+  return loadFixture("coffee-shop.json");
+}
+
+/** A manifest that uses every parameter and result type, for compile checks. */
+export function fieldNotesManifest(): Manifest {
+  return loadFixture("field-notes.json");
+}
+
+/** The example with delete_item and share_list opted in on Android. */
+export function optInManifest(): Manifest {
+  return variant((m) => {
+    m.app.android = { packageName: "com.example.optin" };
+    m.actions[4].platforms = { android: { enabled: true } };
+    m.actions[5].platforms = { android: { enabled: true } };
+  });
 }

@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { generate, writeFiles } from "../src/generators/index.js";
-import { generateKotlin } from "../src/generators/kotlin.js";
+import { appFunctionsValue, generateKotlin } from "../src/generators/kotlin.js";
 import { generateMcp } from "../src/generators/mcp.js";
 import { generateSwift } from "../src/generators/swift.js";
 import type { Manifest } from "../src/manifest.js";
-import { GENERATED_DIR, REPO, loadExample, paymentManifest, variant } from "./helpers.js";
+import { GENERATED_DIR, REPO, fieldNotesManifest, loadExample, optInManifest, paymentManifest, variant } from "./helpers.js";
 
 const IGNORED = new Set(["node_modules", ".wrangler", ".dev.vars"]);
 
@@ -163,11 +163,26 @@ describe("kotlin generator", () => {
     const optInService = file(optIn, `${dir}/BaseTodoExampleAppFunctionService.kt`);
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun deleteItem(");
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun shareList(");
+    // A payment-only app has nothing to expose, and the AppFunctions compiler rejects an
+    // entry point without functions, so only a README explaining why is written.
     const pay = generateKotlin(paymentManifest());
-    const payService = file(pay, "src/main/kotlin/com/example/coffee/omnintent/BaseCoffeeShopAppFunctionService.kt");
-    expect(payService).not.toContain("placeOrder");
-    const order = file(pay, "src/main/kotlin/com/example/coffee/omnintent/Order.kt");
-    expect(order).not.toContain("cardLast4");
+    expect(pay.map((f) => f.path)).toEqual(["README.md"]);
+    expect(file(pay, "README.md")).toContain("`place_order` (payment): moves money, so it is never exposed on Android.");
+  });
+
+  it("writes date, date-time and URI examples as the objects AppFunctions expects", () => {
+    expect(appFunctionsValue("2027-04-15", { type: "string", format: "date" })).toEqual({ year: 2027, month: 4, dayOfMonth: 15 });
+    expect(appFunctionsValue("2026-11-24T12:00:00.250Z", { type: "string", format: "date-time" })).toEqual({ epochSecond: 1795521600, nanoAdjustment: 250_000_000 });
+    expect(appFunctionsValue(["https://a.example"], { type: "array", items: { type: "string", format: "uri" } })).toEqual([{ uri: "https://a.example" }]);
+    expect(appFunctionsValue("milk", { type: "string" })).toBe("milk");
+    const service = file(files, `${dir}/BaseTodoExampleAppFunctionService.kt`);
+    expect(service).toContain('Example: {"year":2027,"month":4,"dayOfMonth":15}.');
+  });
+
+  it("keeps sensitive properties out of serializable classes", () => {
+    const reading = file(generateKotlin(fieldNotesManifest()), "src/main/kotlin/com/example/fieldnotes/omnintent/Reading.kt");
+    expect(reading).toContain("val label: String,");
+    expect(reading).not.toContain("secret");
   });
 
   it("keeps internal properties out of serializable classes", () => {
@@ -185,6 +200,7 @@ describe("kotlin generator", () => {
     const gradle = file(files, "build.gradle.kts.snippet");
     expect(gradle).toContain('implementation("androidx.appfunctions:appfunctions:1.0.0")');
     expect(gradle).toContain('ksp("androidx.appfunctions:appfunctions-compiler:1.0.0")');
+    expect(gradle).toContain('implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")');
   });
 
   const kotlinc = [process.env.KOTLINC, resolve(REPO, ".tools/kotlinc/bin/kotlinc")].find((p) => p && existsSync(p));
@@ -195,12 +211,8 @@ describe("kotlin generator", () => {
       const sources: string[] = [];
       for (const [name, manifest] of [
         ["todo", loadExample()],
-        ["coffee", paymentManifest()],
-        ["todo-optin", variant((m) => {
-          m.app.android = { packageName: "com.example.optin" };
-          m.actions[4].platforms = { android: { enabled: true } };
-          m.actions[5].platforms = { android: { enabled: true } };
-        })],
+        ["todo-optin", optInManifest()],
+        ["field-notes", fieldNotesManifest()],
       ] as [string, Manifest][]) {
         const target = join(out, name);
         writeFiles(target, generateKotlin(manifest));

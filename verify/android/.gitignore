@@ -1,0 +1,6 @@
+# Written by prepare.mjs from the current generator output.
+/modules/
+.gradle/
+build/
+local.properties
+.kotlin/

@@ -111,7 +111,7 @@ export const TOOLS: ToolDefinition[] = [
         "dueDate": {
           "type": "string",
           "title": "Due Date",
-          "description": "The day the item is due, as YYYY-MM-DD. Omit when the user gives no date.",
+          "description": "The day the item is due. Omit when the user gives no date.",
           "format": "date"
         }
       },

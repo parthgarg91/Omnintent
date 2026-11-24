@@ -71,7 +71,7 @@ PORT=8787 MCP_SERVER_URL=http://127.0.0.1:8787 BACKEND_OAUTH_CLIENT_ID=todo-mcp 
 The example signs each person in with OAuth 2.1 (SPEC.md section E.5). A backend without its own
 OAuth server can use one shared token instead (section E.4).
 
-Run everything (build, type checks, 188 tests including end-to-end MCP with OAuth sign-in on Node and
+Run everything (build, type checks, 190 tests including end-to-end MCP with OAuth sign-in on Node and
 workerd):
 
 ```sh
@@ -79,7 +79,9 @@ npm test
 ```
 
 The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlinc.sh` downloads it
-from GitHub releases into `.tools/`.
+from GitHub releases into `.tools/`. That check uses stubs; `verify/android` builds the generated Kotlin
+with the real AppFunctions compiler and runs it on an Android emulator (on GitHub Actions, or locally
+with the Android SDK; see its README).
 
 ## Commands
 
@@ -101,6 +103,7 @@ SPEC.md                        Omnintent Rule Book v0.1 (the open standard)
 schema/omnintent.schema.json   JSON Schema for omnintent.json
 packages/cli/                  The omnintent CLI (TypeScript)
 examples/todo/                 Example manifest, OpenAPI file, mock backend, generated output
+verify/android/                Builds generated Kotlin with the real AppFunctions compiler
 docs/RESEARCH.md               Platform research with sources (November 2026)
 docs/ARCHITECTURE.md           Components and the agentic roadmap
 docs/BUILDER.md                The builder agent: setup, safety, GitHub Actions example

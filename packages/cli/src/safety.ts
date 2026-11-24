@@ -133,16 +133,19 @@ export function refName(ref: string): string {
 }
 
 /**
- * Action-level authentication: the strictest of the explicit override, the
- * safety level's minimum, and the privacy of any entity the action returns.
- * An explicit `authentication` can only raise the level, never lower it.
+ * Action-level authentication: the strictest of the safety level's minimum,
+ * the explicit `authentication`, and the privacy of any entity the action
+ * returns. On write actions an explicit value replaces the safety minimum (so
+ * a harmless write can run while the device is locked); on destructive and
+ * payment actions it can only raise the level.
  */
 export function actionAuth(manifest: Manifest, action: Action): AuthLevel {
   const fromOutputs = outputEntities(action).map((name) => {
     const entity = manifest.entities?.[name];
     return entity ? entityAuth(entity) : undefined;
   });
-  return maxAuth(SAFETY[action.safety].minAuth, action.authentication, ...fromOutputs);
+  const floor = action.safety === "write" && action.authentication ? "none" : SAFETY[action.safety].minAuth;
+  return maxAuth(floor, action.authentication, ...fromOutputs);
 }
 
 export function needsConfirmation(action: Action): boolean {
@@ -162,10 +165,21 @@ export function confirmationPrompt(action: Action): string {
   return action.confirmation?.prompt ?? `${action.title}?`;
 }
 
+/**
+ * Android rule for one action. AppFunctions gives the app no confirmation
+ * step, so anything that must be confirmed is opt-in there, and payment
+ * actions are never exposed.
+ */
+export function androidRule(action: Action): AndroidRule {
+  const rule = SAFETY[action.safety].android;
+  if (rule === "generate" && needsConfirmation(action)) return "opt-in";
+  return rule;
+}
+
 export function isEnabledFor(action: Action, platform: "ios" | "android" | "mcp"): boolean {
   const explicit = action.platforms?.[platform]?.enabled;
   if (platform === "android") {
-    const rule = SAFETY[action.safety].android;
+    const rule = androidRule(action);
     if (rule === "never") return false;
     if (rule === "opt-in") return explicit === true;
     return explicit ?? true;

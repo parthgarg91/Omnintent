@@ -10,5 +10,5 @@ export { discover, type DiscoverOptions, type DiscoverResult } from "./discover/
 export { draftFromOpenApi, loadOpenApi } from "./discover/openapi.js";
 export { draftWithAi, proposalToManifest, PROPOSAL_SCHEMA, DEFAULT_MODEL, ANTHROPIC_VERSION, type Proposal } from "./discover/ai.js";
 export { testManifest, testPlan, formatReport } from "./testcmd.js";
-export { SAFETY, actionAuth, needsConfirmation, mcpConfirmation, isEnabledFor } from "./safety.js";
+export { SAFETY, actionAuth, androidRule, needsConfirmation, mcpConfirmation, isEnabledFor, skillsFor } from "./safety.js";
 export { manifestSchema, mcpInputSchema, mcpOutputSchema } from "./schema.js";

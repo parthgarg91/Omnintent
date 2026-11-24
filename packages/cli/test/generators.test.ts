@@ -88,6 +88,17 @@ describe("swift generator", () => {
     expect(order).toContain('default: .small');
   });
 
+  it("lets write actions lower authentication, but never destructive ones", () => {
+    const lowered = generateSwift(
+      variant((m) => {
+        m.actions[5].authentication = "none"; // share_list: write, returns no entity
+        m.actions[4].authentication = "none"; // delete_item: destructive
+      }),
+    );
+    expect(file(lowered, "OmnintentGenerated/Intents/ShareListIntent.swift")).toContain("IntentAuthenticationPolicy = .alwaysAllowed");
+    expect(file(lowered, "OmnintentGenerated/Intents/DeleteItemIntent.swift")).toContain("IntentAuthenticationPolicy = .requiresAuthentication");
+  });
+
   it("generates entities with queries, internal visibility and property policies", () => {
     const item = file(files, "OmnintentGenerated/Entities/TodoItemEntity.swift");
     expect(item).toContain("struct TodoItemEntity: AppEntity {");
@@ -141,10 +152,17 @@ describe("kotlin generator", () => {
   it("applies Android safety rules", () => {
     const service = file(files, `${dir}/BaseTodoExampleAppFunctionService.kt`);
     expect(service).not.toContain("fun deleteItem");
-    const optIn = generateKotlin(variant((m) => (m.actions[4].platforms = { android: { enabled: true } })));
-    expect(file(optIn, `${dir}/BaseTodoExampleAppFunctionService.kt`)).toContain(
-      "@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun deleteItem(",
+    expect(service).not.toContain("fun shareList"); // write action that requires confirmation
+    expect(service).toContain("@AppFunctionDeclaration(isDescribedByKDoc = true)\n    suspend fun completeItem(");
+    const optIn = generateKotlin(
+      variant((m) => {
+        m.actions[4].platforms = { android: { enabled: true } };
+        m.actions[5].platforms = { android: { enabled: true } };
+      }),
     );
+    const optInService = file(optIn, `${dir}/BaseTodoExampleAppFunctionService.kt`);
+    expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun deleteItem(");
+    expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun shareList(");
     const pay = generateKotlin(paymentManifest());
     const payService = file(pay, "src/main/kotlin/com/example/coffee/omnintent/BaseCoffeeShopAppFunctionService.kt");
     expect(payService).not.toContain("placeOrder");
@@ -181,6 +199,7 @@ describe("kotlin generator", () => {
         ["todo-optin", variant((m) => {
           m.app.android = { packageName: "com.example.optin" };
           m.actions[4].platforms = { android: { enabled: true } };
+          m.actions[5].platforms = { android: { enabled: true } };
         })],
       ] as [string, Manifest][]) {
         const target = join(out, name);

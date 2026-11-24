@@ -5,7 +5,7 @@
 
 import type { Action, Entity, EntityProperty, Manifest, ParameterSchema, ValueSchema } from "../manifest.js";
 import { camelCase, commentText, kotlinIdent, kotlinString, pascalCase, snakeCase, xmlAttr } from "../naming.js";
-import { SAFETY, isEnabledFor, skillsFor } from "../safety.js";
+import { androidRule, isEnabledFor, skillsFor } from "../safety.js";
 import { agentVisibleProperties, outputShape } from "../schema.js";
 import { HEADER, exampleValue, lines, lowerFirst, type GeneratedFile } from "./types.js";
 
@@ -283,7 +283,7 @@ function functionBlock(manifest: Manifest, action: Action): string[] {
     return `     * @param ${p.name} ${commentText(p.schema.description + values + def + ex)}`;
   });
   const ret = returnDoc(manifest, action);
-  const enabled = SAFETY[action.safety].android === "opt-in" ? "isEnabled = false, " : "";
+  const enabled = androidRule(action) === "opt-in" ? "isEnabled = false, " : "";
 
   const sig = params.map((p) => {
     const constraint = p.schema.enum ? `@AppFunctionStringValueConstraint(enumValues = [${p.schema.enum.map(kotlinString).join(", ")}]) ` : "";
@@ -347,7 +347,7 @@ function serviceFile(manifest: Manifest, names: KotlinNames, actions: Action[]):
     " * which must implement [OmnintentHandlersProvider]. No dependency-injection framework is required.",
     excluded.length ? " *" : false,
     excluded.length
-      ? ` * Not exposed on Android (destructive or payment actions, or disabled in the manifest): ${excluded.map((a) => a.name).join(", ")}.`
+      ? ` * Not exposed on Android (they need confirmation or move money, or are disabled in the manifest): ${excluded.map((a) => a.name).join(", ")}.`
       : false,
     " */",
     "@RequiresApi(36)",
@@ -462,10 +462,11 @@ function readme(manifest: Manifest, names: KotlinNames, actions: Action[]): stri
     "",
     "## Safety rules applied",
     "",
-    "- AppFunctions should perform only safe tasks the user could do in your app, so destructive actions are",
-    "  generated only when the manifest opts in (`platforms.android.enabled: true`), and then with",
-    "  `isEnabled = false`. Enable them at runtime with `AppFunctionManager.setAppFunctionEnabled` only after",
-    "  your own consent UI. Payment actions are never generated for Android.",
+    "- AppFunctions should perform only safe tasks the user could do in your app, and they give the app no",
+    "  confirmation step. So destructive actions, and write actions that require confirmation, are generated",
+    "  only when the manifest opts in (`platforms.android.enabled: true`), and then with `isEnabled = false`.",
+    "  Enable them at runtime with `AppFunctionManager.setAppFunctionEnabled` only after your own consent UI.",
+    "  Payment actions are never generated for Android.",
     "- Properties marked `internal` or `sensitive` are left out of the returned data classes.",
     "- Agents omit optional parameters as null, zero, false or empty; the generated functions resolve manifest",
     "  defaults in the function body.",

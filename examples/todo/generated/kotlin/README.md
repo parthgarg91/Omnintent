@@ -24,14 +24,15 @@ developer preview.
 
 ## Safety rules applied
 
-- AppFunctions should perform only safe tasks the user could do in your app, so destructive actions are
-  generated only when the manifest opts in (`platforms.android.enabled: true`), and then with
-  `isEnabled = false`. Enable them at runtime with `AppFunctionManager.setAppFunctionEnabled` only after
-  your own consent UI. Payment actions are never generated for Android.
+- AppFunctions should perform only safe tasks the user could do in your app, and they give the app no
+  confirmation step. So destructive actions, and write actions that require confirmation, are generated
+  only when the manifest opts in (`platforms.android.enabled: true`), and then with `isEnabled = false`.
+  Enable them at runtime with `AppFunctionManager.setAppFunctionEnabled` only after your own consent UI.
+  Payment actions are never generated for Android.
 - Properties marked `internal` or `sensitive` are left out of the returned data classes.
 - Agents omit optional parameters as null, zero, false or empty; the generated functions resolve manifest
   defaults in the function body.
-- Not generated here: `delete_item` (destructive).
+- Not generated here: `delete_item` (destructive), `share_list` (write).
 
 ## Verify on a device
 

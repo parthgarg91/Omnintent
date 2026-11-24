@@ -97,6 +97,10 @@ describe("validate", () => {
     expect(rules(variant((m) => (m.actions[4].safety = "write")))).toContain("warning:OI134");
   });
 
+  it("warns that opted-in confirmation actions are disabled on Android (OI141)", () => {
+    expect(rules(variant((m) => (m.actions[5].platforms = { android: { enabled: true } })))).toContain("warning:OI141");
+  });
+
   it("forbids payment actions on Android (OI140)", () => {
     const pay = paymentManifest();
     pay.actions[0].platforms = { android: { enabled: true } };

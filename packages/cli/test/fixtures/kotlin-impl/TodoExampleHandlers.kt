@@ -4,7 +4,6 @@
 package com.example.todoexample.omnintent
 
 import android.app.Application
-import android.net.Uri
 import java.time.LocalDate
 
 class FakeTodoHandlers : OmnintentHandlers {
@@ -17,9 +16,6 @@ class FakeTodoHandlers : OmnintentHandlers {
 
     override suspend fun completeItem(itemId: String): TodoItem =
         TodoItem(id = itemId, listId = "groceries", title = "Buy milk", done = true)
-
-    override suspend fun shareList(listId: String, email: String): ShareListResult =
-        ShareListResult(shareUrl = Uri.parse("http://localhost:8788/shared/$listId"), sharedWith = email)
 }
 
 class FakeApp : Application(), OmnintentHandlersProvider {

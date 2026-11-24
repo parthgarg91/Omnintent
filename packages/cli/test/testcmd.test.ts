@@ -50,6 +50,7 @@ describe("omnintent test (static utterance checks)", () => {
       "--function 'com.example.todoexample.omnintent.BaseTodoExampleAppFunctionService#addItem'",
     );
     expect(files["adb-commands.sh"]).not.toContain("#deleteItem");
+    expect(files["adb-commands.sh"]).not.toContain("#shareList");
     expect(files["siri-requests.md"]).toContain("| Delete the eggs item | Delete Item |");
   });
 

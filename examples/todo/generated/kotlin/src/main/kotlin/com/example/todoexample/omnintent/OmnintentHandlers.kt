@@ -21,9 +21,6 @@ interface OmnintentHandlers {
 
     /** Marks a to-do item as done and returns the updated item. */
     suspend fun completeItem(itemId: String): TodoItem
-
-    /** Shares a to-do list with another person by email and returns the share link. */
-    suspend fun shareList(listId: String, email: String): ShareListResult
 }
 
 /** Implement on your Application class so the generated AppFunctionService can find the handlers. */

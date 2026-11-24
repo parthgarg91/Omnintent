@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import type { ErrorObject } from "ajv";
 import type { Action, Entity, Manifest, ParameterSchema, ValueSchema } from "./manifest.js";
 import { isCamelCase, isSnakeCase } from "./naming.js";
-import { SAFETY, isEnabledFor, refName } from "./safety.js";
+import { SAFETY, androidRule, isEnabledFor, refName } from "./safety.js";
 import { createAjv, manifestSchema, mcpInputSchema, propertyPrivacy } from "./schema.js";
 
 export type Severity = "error" | "warning";
@@ -321,8 +321,8 @@ function checkPlatforms(action: Action, base: string, add: Add) {
   if (action.safety === "payment" && android === true) {
     add("error", "OI140", `${base}/platforms/android`, "payment actions cannot be exposed as Android AppFunctions (they must not handle financial details)");
   }
-  if (action.safety === "destructive" && android === true) {
-    add("warning", "OI141", `${base}/platforms/android`, "destructive AppFunctions are generated disabled (isEnabled = false); enable them at runtime only after your own consent UI");
+  if (androidRule(action) === "opt-in" && android === true) {
+    add("warning", "OI141", `${base}/platforms/android`, "this AppFunction needs confirmation, so it is generated disabled (isEnabled = false); enable it at runtime only after your own consent UI");
   }
 }
 

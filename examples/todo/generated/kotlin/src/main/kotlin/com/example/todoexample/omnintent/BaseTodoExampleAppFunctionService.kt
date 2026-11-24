@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
  * concrete TodoExampleAppFunctionService from this class. Handlers come from the Application,
  * which must implement [OmnintentHandlersProvider]. No dependency-injection framework is required.
  *
- * Not exposed on Android (destructive or payment actions, or disabled in the manifest): delete_item.
+ * Not exposed on Android (they need confirmation or move money, or are disabled in the manifest): delete_item, share_list.
  */
 @RequiresApi(36)
 @AppFunctionServiceEntryPoint(
@@ -85,22 +85,5 @@ abstract class BaseTodoExampleAppFunctionService : AppFunctionService() {
     ): TodoItem = withContext(Dispatchers.IO) {
         if (itemId.isBlank()) throw AppFunctionInvalidArgumentException("itemId must not be blank.")
         handlers.completeItem(itemId = itemId)
-    }
-
-    /**
-     * Shares a to-do list with another person by email and returns the share link.
-     *
-     * @param listId The ID of the list to share, for example "groceries". Example: "groceries".
-     * @param email The email address of the person to share the list with. Example: "sam@example.com".
-     * @return The outcome of sharing a list.
-     */
-    @AppFunctionDeclaration(isDescribedByKDoc = true)
-    suspend fun shareList(
-        listId: String,
-        email: String,
-    ): ShareListResult = withContext(Dispatchers.IO) {
-        if (listId.isBlank()) throw AppFunctionInvalidArgumentException("listId must not be blank.")
-        if (email.isBlank()) throw AppFunctionInvalidArgumentException("email must not be blank.")
-        handlers.shareList(listId = listId, email = email)
     }
 }

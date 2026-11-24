@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { AGENT_HELP, runAgentCommand } from "./agents/commands.js";
 import { discover } from "./discover/index.js";
 import { generate, parseTargets, writeFiles } from "./generators/index.js";
 import { CLI_VERSION, type Manifest } from "./manifest.js";
@@ -17,7 +18,7 @@ Usage:
   omnintent generate <omnintent.json> --target swift|kotlin|mcp|all --out <dir>
   omnintent discover <openapi-file|code-directory> [--out omnintent.json] [--no-ai] [--model <id>] [--force]
   omnintent test <omnintent.json> [--plan <dir>] [--json]
-
+${AGENT_HELP}
 Commands:
   validate  Check the manifest against the JSON Schema and the rule book.
   generate  Write Swift App Intents, Kotlin AppFunctions and/or an MCP server.
@@ -25,7 +26,8 @@ Commands:
             ANTHROPIC_API_KEY set, Claude refines the draft. Only a valid
             manifest is ever written.
   test      Check that sample utterances match their expected arguments.
-            --plan writes test cases for SiriEvaluations, adb and MCP.
+            --plan writes test cases, a SiriEvaluations test file, and
+            Android adb and agent checklists.
 `;
 
 function fail(message: string): never {
@@ -49,6 +51,9 @@ function loadValid(path: string, json: boolean): Manifest {
 }
 
 async function main(argv: string[]): Promise<void> {
+  // The tester agent parses its own options.
+  const agentExit = argv[0] ? await runAgentCommand(argv[0], argv.slice(1)) : undefined;
+  if (agentExit !== undefined) process.exit(agentExit);
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,

@@ -1,11 +1,12 @@
 // `omnintent test`: static checks on sample utterances, plus an optional test
-// plan for live testing (SiriEvaluations, adb, MCP). Live agent testing itself
-// is future work; see docs/ARCHITECTURE.md.
+// plan for live testing (SiriEvaluations, adb, MCP). Live agent testing is
+// `omnintent agent-test` (src/agents/tester).
 
 import type { Action, Manifest } from "./manifest.js";
 import { adbExecute, kotlinNames } from "./generators/kotlin.js";
 import { isEnabledFor } from "./safety.js";
 import type { GeneratedFile } from "./generators/types.js";
+import { devicePlans } from "./agents/tester/android.js";
 
 export interface TestFinding {
   severity: "error" | "warning";
@@ -157,5 +158,6 @@ export function testPlan(manifest: Manifest): GeneratedFile[] {
         "",
       ].join("\n"),
     },
+    ...devicePlans(manifest),
   ];
 }

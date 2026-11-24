@@ -12,3 +12,4 @@ export { draftWithAi, proposalToManifest, PROPOSAL_SCHEMA, DEFAULT_MODEL, ANTHRO
 export { testManifest, testPlan, formatReport } from "./testcmd.js";
 export { SAFETY, actionAuth, androidRule, needsConfirmation, mcpConfirmation, isEnabledFor, skillsFor } from "./safety.js";
 export { manifestSchema, mcpInputSchema, mcpOutputSchema } from "./schema.js";
+export * from "./agents/index.js";

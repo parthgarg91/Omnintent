@@ -1,0 +1,37 @@
+{
+  "list_lists": {
+    "result": {
+      "items": [
+        { "id": "groceries", "name": "Groceries", "openCount": 1 },
+        { "id": "work", "name": "Work", "openCount": 1 }
+      ]
+    }
+  },
+  "list_items": [
+    {
+      "arguments": { "listId": "groceries", "status": "done" },
+      "result": { "items": [{ "id": "item-2", "listId": "groceries", "title": "Buy eggs", "done": true }] }
+    },
+    {
+      "arguments": { "listId": "groceries", "status": "all" },
+      "result": {
+        "items": [
+          { "id": "item-1", "listId": "groceries", "title": "Buy milk", "done": false },
+          { "id": "item-2", "listId": "groceries", "title": "Buy eggs", "done": true }
+        ]
+      }
+    },
+    {
+      "arguments": { "listId": "groceries" },
+      "result": { "items": [{ "id": "item-1", "listId": "groceries", "title": "Buy milk", "done": false }] }
+    },
+    {
+      "arguments": { "listId": "work", "status": "done" },
+      "result": { "items": [] }
+    },
+    {
+      "arguments": { "listId": "work" },
+      "result": { "items": [{ "id": "item-3", "listId": "work", "title": "Send report", "done": false, "dueDate": "2026-12-01" }] }
+    }
+  ]
+}

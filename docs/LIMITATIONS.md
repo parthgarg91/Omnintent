@@ -19,6 +19,10 @@ network policy.
 | Swift | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
 | Discovery, AI path | Against a **fake** Messages API: request shape (URL, headers, `claude-opus-5-5`, `output_config.format`), conversion, the repair loop, giving up on persistent errors, and the CLI writing nothing when the draft stays invalid | Pass. |
+| Tester agent, scoring | **Fake** models: right and wrong actions, argument differences (case, quotes, defaults, dates, numbers), lookups answered from fixtures, one "Yes, go ahead." follow-up, refusals and API errors, write calls never executed, Android cases for hidden actions, repeated runs | Pass. |
+| Tester agent, live MCP | The generated server on Node, the mock backend and the official MCP client 2.4.0, with a fake model: tools and read-only flags match `tools/list`, lookups return real (filtered) data, all 12 samples run with **no change to backend state**, edited descriptions over live data, drift between server and manifest | Pass. |
+| Tester agent, Claude request | Against a **fake** Messages API: tools with `input_schema`, `tool_choice: auto`, `output_config.effort`, no sampling parameters, no fallback model, retry on 529, no retry on 400; the CLI end to end (report, Markdown, `--fail-under` exit code) | Pass. |
+| Siri and Android plans | The SiriEvaluations file follows Apple's documentation (fetched November 24, 2026) and parses with `tree-sitter-swift`; `run-functions.sh` passes `sh -n`; imported results are scored | Pass. |
 
 The 7 end-to-end checks run on each runtime:
 
@@ -30,7 +34,7 @@ The 7 end-to-end checks run on each runtime:
 6. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
 7. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 79 tests across 5 files (`npm test`).
+Total: 107 tests across 7 files (`npm test`). 106 passed in this run; the Kotlin compile test was skipped because `kotlinc` was not downloaded this time.
 
 ## Not verified
 
@@ -88,6 +92,26 @@ Total: 79 tests across 5 files (`npm test`).
 - MCP's Skills extension (in the SDK as `@modelcontextprotocol/server/ext/skills`) is not used.
   Skills are added to the server instructions instead.
 
+### Tester agent
+
+- **Never run against the real Anthropic API** (no key here). Every scored run used fake models.
+  How often Claude picks the right action for these samples is unmeasured.
+- Claude stands in for the host's model. Real hosts (Claude apps, ChatGPT, Gemini, Meta Muse) add
+  their own system prompts, tool-name prefixes, connector settings and confirmation steps, so a
+  pass here is evidence, not a guarantee. The iOS and Android projections (`--platform`) only show
+  which actions those platforms expose and what they are called; they are not Siri or Gemini.
+- The tester answers one clarifying question with "Yes, go ahead." and gives up after that, so an
+  agent that asks for a missing value counts as "no action".
+- Reads are called for real on `--server`; the manifest's `read` safety and the server's
+  `readOnlyHint` must both say read. Point it at staging data. Writes are never executed, so a
+  case cannot check that the backend accepts the arguments.
+- **The Siri test was not compiled or run.** No Xcode 27.3 or device here. Unconfirmed: that
+  `Finds { … .expect(id:) }` can check entity identifiers, that enum, date and URL parameters need a
+  report check instead of a matcher, and that a "Yes" turn satisfies confirmation in a scenario.
+- **The Android script was not run.** No device or SDK here. The `grep` for each function in
+  `list-app-functions` output assumes the output contains `Class#method` identifiers. Results from
+  the AppFunctions testing agent and Gemini are recorded by hand; there is no API to script them.
+
 ### Discovery
 
 - The AI path was never called against the real Anthropic API (there is no key in this
@@ -113,6 +137,6 @@ could not be fetched. See `docs/RESEARCH.md`.
   is future work.
 - **Stale files.** `generate` does not delete files from earlier runs. Generate into a clean
   directory.
-- **Live tests.** `omnintent test` is static. Driving live agents is the tester agent's job
-  (`docs/ARCHITECTURE.md`).
+- **Live tests.** `omnintent agent-test` drives a model; Siri and Android results are imported by
+  hand. The optimizer agent is not part of this repository.
 - **Not published.** The CLI is not on npm. Run `node packages/cli/dist/cli.js` or `npm link`.

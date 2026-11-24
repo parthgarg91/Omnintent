@@ -28,6 +28,9 @@ times, badly.
 3. **Check.** `omnintent validate` applies the [rule book](SPEC.md): unique snake_case names, real
    descriptions, at least two sample utterances per action, and confirmation for destructive and
    payment actions. `omnintent test` checks that each utterance matches its expected arguments.
+   `omnintent agent-test` plays the utterances to Claude acting as an agent with your tools and
+   reports which action it chose, with which arguments; `test --plan` writes the same cases for
+   Siri (a SiriEvaluations test) and Android (adb and an agent checklist).
 4. **Generate.** `omnintent generate` writes three things:
    - Swift `@AppIntent(.tool)` intents and entities.
    - A Kotlin `AppFunctionService` with KDoc written from your descriptions.
@@ -50,6 +53,9 @@ node packages/cli/dist/cli.js validate examples/todo/omnintent.json
 node packages/cli/dist/cli.js test examples/todo/omnintent.json --plan /tmp/todo-plan
 node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all --out /tmp/todo-out
 
+# See which action an agent picks for each sample (needs ANTHROPIC_API_KEY; makes API calls).
+node packages/cli/dist/cli.js agent-test examples/todo/omnintent.json --fixtures examples/todo/tester-fixtures.json
+
 # Draft a manifest from an OpenAPI file (set ANTHROPIC_API_KEY to let Claude refine it).
 node packages/cli/dist/cli.js discover examples/todo/openapi.yaml --out /tmp/omnintent.json
 
@@ -60,7 +66,7 @@ BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run 
 # MCP endpoint: http://127.0.0.1:8787/mcp
 ```
 
-Run everything (build, type checks, 79 tests including end-to-end MCP on Node and workerd):
+Run everything (build, type checks, 107 tests including end-to-end MCP on Node and workerd):
 
 ```sh
 npm test
@@ -77,6 +83,7 @@ from GitHub releases into `.tools/`.
 | `omnintent generate <manifest> --target swift\|kotlin\|mcp\|all --out <dir>` | Deterministic code generation. |
 | `omnintent discover <openapi-file\|dir> [--out omnintent.json] [--no-ai] [--model <id>]` | Drafts a manifest. It never writes an invalid one. |
 | `omnintent test <manifest> [--plan <dir>]` | Utterance checks, plus test plans for SiriEvaluations, adb and MCP. |
+| `omnintent agent-test <manifest> [--server <url>] [--platform mcp\|ios\|android] [--runs <n>]` | Claude plays the agent; reports the action and arguments it chose for each sample. `--import` reads results recorded on Siri or Android. |
 
 ## Repository
 

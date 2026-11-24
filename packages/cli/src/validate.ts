@@ -140,6 +140,21 @@ function semanticIssues(m: Manifest): Issue[] {
   } else if (!/^https?:\/\//.test(m.backend.baseUrl)) {
     add("error", "OI173", "/backend/baseUrl", "baseUrl must start with http:// or https:// (or be a <PLACEHOLDER>)");
   }
+  const auth = m.backend?.auth;
+  if (auth?.type === "oauth") {
+    for (const key of ["authorizationUrl", "tokenUrl"] as const) {
+      const value = auth[key];
+      const path = `/backend/auth/${key}`;
+      if (/[<>]/.test(value)) {
+        const env = key === "tokenUrl" ? "BACKEND_OAUTH_TOKEN_URL" : "BACKEND_OAUTH_AUTHORIZATION_URL";
+        add("warning", "OI174", path, `${key} is a placeholder; set ${env} when you deploy the MCP server`);
+      } else if (!/^https?:\/\//.test(value)) {
+        add("error", "OI174", path, `${key} must start with https:// (or be a <PLACEHOLDER>)`);
+      } else if (value.startsWith("http://") && !isLoopback(value)) {
+        add("error", "OI175", path, `${key} must use https://; OAuth 2.1 allows http:// only for localhost`);
+      }
+    }
+  }
   return issues;
 }
 
@@ -358,4 +373,13 @@ export function formatIssues(issues: Issue[]): string {
   return issues
     .map((i) => `${i.severity === "error" ? "error  " : "warning"} ${i.rule.padEnd(6)} ${i.path}: ${i.message}`)
     .join("\n");
+}
+
+function isLoopback(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "[::1]" || /^127\.\d+\.\d+\.\d+$/.test(host);
+  } catch {
+    return false;
+  }
 }

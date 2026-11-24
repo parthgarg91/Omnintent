@@ -12,3 +12,26 @@ export { draftWithAi, proposalToManifest, PROPOSAL_SCHEMA, DEFAULT_MODEL, ANTHRO
 export { testManifest, testPlan, formatReport } from "./testcmd.js";
 export { SAFETY, actionAuth, androidRule, needsConfirmation, mcpConfirmation, isEnabledFor, skillsFor } from "./safety.js";
 export { manifestSchema, mcpInputSchema, mcpOutputSchema } from "./schema.js";
+export {
+  runBuilder,
+  formatBuildReport,
+  branchName,
+  pullRequestBody,
+  parseBuilderConfig,
+  loadBuilderConfig,
+  GitHubRest,
+  diffManifests,
+  WIRING_SCHEMA,
+  checkProposal,
+  type BuildOptions,
+  type BuildReport,
+  type PlatformReport,
+  type BuilderConfig,
+  type PlatformConfig,
+  type GitHost,
+  type ManifestChanges,
+} from "./builder/index.js";
+export { runWatch, formatWatchReport, issueTitle, researchBaseline, httpFetcher, type WatchReport, type WatchState, type Finding, type Fetcher } from "./agents/watch/watch.js";
+export { WATCH_SOURCES, type WatchSource } from "./agents/watch/sources.js";
+export { prepareSubmission, parseSubmitPlatforms, APPLE_LIMITS, type SubmissionBundle } from "./agents/submit/submit.js";
+export * from "./agents/index.js";

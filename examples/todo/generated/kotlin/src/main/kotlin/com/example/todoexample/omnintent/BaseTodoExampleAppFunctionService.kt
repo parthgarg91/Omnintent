@@ -42,7 +42,7 @@ abstract class BaseTodoExampleAppFunctionService : AppFunctionService() {
      *
      * @param listId The ID of the list to add the item to, for example "groceries". Example: "groceries".
      * @param title What needs to be done, for example "Buy milk". Example: "milk".
-     * @param dueDate The day the item is due, as YYYY-MM-DD. Omit when the user gives no date. Example: "2027-04-15".
+     * @param dueDate The day the item is due. Omit when the user gives no date. Example: {"year":2027,"month":4,"dayOfMonth":15}.
      * @return The to-do item: one task on a to-do list.
      */
     @AppFunctionDeclaration(isDescribedByKDoc = true)

@@ -9,8 +9,15 @@ export const APP: AppDefinition = {
   "backend": {
     "baseUrl": "http://localhost:8788",
     "auth": {
-      "type": "bearer",
-      "secret": "BACKEND_TOKEN"
+      "type": "oauth",
+      "authorizationUrl": "http://localhost:8788/oauth/authorize",
+      "tokenUrl": "http://localhost:8788/oauth/token",
+      "userInfoPath": "/me",
+      "userIdPointer": "/id",
+      "scopes": [
+        "todo"
+      ],
+      "tokenAuthMethod": "client_secret_basic"
     },
     "timeoutMs": 10000
   }
@@ -104,7 +111,7 @@ export const TOOLS: ToolDefinition[] = [
         "dueDate": {
           "type": "string",
           "title": "Due Date",
-          "description": "The day the item is due, as YYYY-MM-DD. Omit when the user gives no date.",
+          "description": "The day the item is due. Omit when the user gives no date.",
           "format": "date"
         }
       },

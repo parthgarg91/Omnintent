@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { generate, writeFiles } from "../src/generators/index.js";
-import { generateKotlin } from "../src/generators/kotlin.js";
+import { appFunctionsValue, generateKotlin } from "../src/generators/kotlin.js";
 import { generateMcp } from "../src/generators/mcp.js";
 import { generateSwift } from "../src/generators/swift.js";
 import type { Manifest } from "../src/manifest.js";
-import { GENERATED_DIR, REPO, loadExample, paymentManifest, variant } from "./helpers.js";
+import { GENERATED_DIR, REPO, fieldNotesManifest, loadExample, optInManifest, paymentManifest, variant } from "./helpers.js";
 import { IOS_TOOL_SDK_MAJOR, findIosSdk, forOlderSdk, swiftcTypecheckArgs } from "./swift-sdk.js";
 
 const IGNORED = new Set(["node_modules", ".wrangler", ".dev.vars"]);
@@ -219,11 +219,26 @@ describe("kotlin generator", () => {
     const optInService = file(optIn, `${dir}/BaseTodoExampleAppFunctionService.kt`);
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun deleteItem(");
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun shareList(");
+    // A payment-only app has nothing to expose, and the AppFunctions compiler rejects an
+    // entry point without functions, so only a README explaining why is written.
     const pay = generateKotlin(paymentManifest());
-    const payService = file(pay, "src/main/kotlin/com/example/coffee/omnintent/BaseCoffeeShopAppFunctionService.kt");
-    expect(payService).not.toContain("placeOrder");
-    const order = file(pay, "src/main/kotlin/com/example/coffee/omnintent/Order.kt");
-    expect(order).not.toContain("cardLast4");
+    expect(pay.map((f) => f.path)).toEqual(["README.md"]);
+    expect(file(pay, "README.md")).toContain("`place_order` (payment): moves money, so it is never exposed on Android.");
+  });
+
+  it("writes date, date-time and URI examples as the objects AppFunctions expects", () => {
+    expect(appFunctionsValue("2027-04-15", { type: "string", format: "date" })).toEqual({ year: 2027, month: 4, dayOfMonth: 15 });
+    expect(appFunctionsValue("2026-11-24T12:00:00.250Z", { type: "string", format: "date-time" })).toEqual({ epochSecond: 1795521600, nanoAdjustment: 250_000_000 });
+    expect(appFunctionsValue(["https://a.example"], { type: "array", items: { type: "string", format: "uri" } })).toEqual([{ uri: "https://a.example" }]);
+    expect(appFunctionsValue("milk", { type: "string" })).toBe("milk");
+    const service = file(files, `${dir}/BaseTodoExampleAppFunctionService.kt`);
+    expect(service).toContain('Example: {"year":2027,"month":4,"dayOfMonth":15}.');
+  });
+
+  it("keeps sensitive properties out of serializable classes", () => {
+    const reading = file(generateKotlin(fieldNotesManifest()), "src/main/kotlin/com/example/fieldnotes/omnintent/Reading.kt");
+    expect(reading).toContain("val label: String,");
+    expect(reading).not.toContain("secret");
   });
 
   it("keeps internal properties out of serializable classes", () => {
@@ -241,6 +256,7 @@ describe("kotlin generator", () => {
     const gradle = file(files, "build.gradle.kts.snippet");
     expect(gradle).toContain('implementation("androidx.appfunctions:appfunctions:1.0.0")');
     expect(gradle).toContain('ksp("androidx.appfunctions:appfunctions-compiler:1.0.0")');
+    expect(gradle).toContain('implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")');
   });
 
   const kotlinc = [process.env.KOTLINC, resolve(REPO, ".tools/kotlinc/bin/kotlinc")].find((p) => p && existsSync(p));
@@ -251,12 +267,8 @@ describe("kotlin generator", () => {
       const sources: string[] = [];
       for (const [name, manifest] of [
         ["todo", loadExample()],
-        ["coffee", paymentManifest()],
-        ["todo-optin", variant((m) => {
-          m.app.android = { packageName: "com.example.optin" };
-          m.actions[4].platforms = { android: { enabled: true } };
-          m.actions[5].platforms = { android: { enabled: true } };
-        })],
+        ["todo-optin", optInManifest()],
+        ["field-notes", fieldNotesManifest()],
       ] as [string, Manifest][]) {
         const target = join(out, name);
         writeFiles(target, generateKotlin(manifest));
@@ -309,11 +321,44 @@ describe("mcp generator", () => {
     expect(() => generateMcp(variant((m) => delete m.backend))).toThrow(/backend section/);
   });
 
-  it("writes a Workers project", () => {
+  it("writes a Workers project with OAuth sign-in when the backend uses OAuth", () => {
     const pkg = JSON.parse(file(files, "package.json"));
-    expect(pkg.dependencies).toMatchObject({ "@modelcontextprotocol/server": "2.4.0", agents: "0.34.0" });
+    expect(pkg.dependencies).toEqual({
+      "@cloudflare/workers-oauth-provider": "1.3.0",
+      "@modelcontextprotocol/server": "2.4.0",
+      agents: "0.34.0",
+      zod: "^4.2.0",
+    });
     expect(pkg.devDependencies.wrangler).toBeDefined();
-    expect(file(files, "wrangler.jsonc")).toContain('"compatibility_flags": [\n    "nodejs_compat"\n  ]');
-    expect(file(files, "src/index.ts")).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    const wrangler = file(files, "wrangler.jsonc");
+    expect(wrangler).toContain('"compatibility_flags": [\n    "nodejs_compat",\n    "global_fetch_strictly_public"\n  ]');
+    expect(wrangler).toContain('"binding": "OAUTH_KV"');
+    expect(wrangler).toContain('"BACKEND_OAUTH_TOKEN_URL": "http://localhost:8788/oauth/token"');
+    expect(files.map((f) => f.path)).toContain("src/oauth.ts");
+    expect(files.map((f) => f.path)).not.toContain("src/auth.ts");
+    expect(file(files, "src/index.ts")).toContain('import { handleRequest } from "./oauth.ts";');
+    const oauth = file(files, "src/oauth.ts");
+    expect(oauth).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    expect(oauth).toContain("resource: `${serverUrl}/mcp`");
+    expect(oauth).toContain('code_challenge_method", "S256"');
+    // Defaults are filled in, and no credentials end up in generated files.
+    expect(file(files, "src/tools.ts")).toContain('"userIdPointer": "/id"');
+    expect(file(files, "src/tools.ts")).toContain('"tokenAuthMethod": "client_secret_basic"');
+    for (const f of files) expect(f.content).not.toMatch(/todo-mcp-secret|BACKEND_TOKEN=/);
+    expect(file(files, "README.md")).toContain("`MCP_SERVER_URL`");
+    expect(file(files, ".dev.vars.example")).toContain("MCP_SERVER_URL=http://localhost:8787");
+  });
+
+  it("writes a shared-token Workers project when the backend uses a bearer secret", () => {
+    const bearer = generateMcp(variant((m) => (m.backend!.auth = { type: "bearer", secret: "BACKEND_TOKEN" })));
+    const pkg = JSON.parse(file(bearer, "package.json"));
+    expect(pkg.dependencies).toEqual({ "@modelcontextprotocol/server": "2.4.0", agents: "0.34.0", zod: "^4.2.0" });
+    expect(file(bearer, "wrangler.jsonc")).toContain('"compatibility_flags": [\n    "nodejs_compat"\n  ]');
+    expect(file(bearer, "wrangler.jsonc")).not.toContain("OAUTH_KV");
+    expect(bearer.map((f) => f.path)).toContain("src/auth.ts");
+    expect(bearer.map((f) => f.path)).not.toContain("src/oauth.ts");
+    expect(file(bearer, "src/index.ts")).toContain('import { createMcpHandler } from "agents/mcp/server";');
+    expect(file(bearer, ".dev.vars.example")).toContain("MCP_ACCESS_TOKEN=");
+    expect(file(bearer, "README.md")).toContain('`{"type": "oauth", ...}`');
   });
 });

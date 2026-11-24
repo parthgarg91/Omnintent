@@ -13,4 +13,6 @@ android {
 dependencies {
     implementation("androidx.appfunctions:appfunctions:1.0.0")
     ksp("androidx.appfunctions:appfunctions-compiler:1.0.0")
+    // The generated service uses kotlinx.coroutines. Keep your own version if the app already has it.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }

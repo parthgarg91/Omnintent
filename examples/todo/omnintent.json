@@ -12,7 +12,13 @@
   },
   "backend": {
     "baseUrl": "http://localhost:8788",
-    "auth": { "type": "bearer", "secret": "BACKEND_TOKEN" },
+    "auth": {
+      "type": "oauth",
+      "authorizationUrl": "http://localhost:8788/oauth/authorize",
+      "tokenUrl": "http://localhost:8788/oauth/token",
+      "userInfoPath": "/me",
+      "scopes": ["todo"]
+    },
     "timeoutMs": 10000
   },
   "entities": {
@@ -92,7 +98,7 @@
             "type": "string",
             "format": "date",
             "title": "Due Date",
-            "description": "The day the item is due, as YYYY-MM-DD. Omit when the user gives no date."
+            "description": "The day the item is due. Omit when the user gives no date."
           }
         },
         "required": ["listId", "title"],

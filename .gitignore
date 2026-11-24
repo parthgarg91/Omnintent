@@ -9,3 +9,4 @@ dist/
 packages/cli/schema/
 .tools/
 packages/cli/test/.tmp/
+packages/cli/test/.tmp-tester/

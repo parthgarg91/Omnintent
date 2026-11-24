@@ -16,7 +16,7 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { APP, TOOLS } from "./tools.ts";
-import type { JsonSchema, ToolDefinition } from "./types.ts";
+import type { JsonSchema, ToolDefinition, UserCredentials } from "./types.ts";
 
 /** Worker bindings and variables. Secrets and vars are both plain strings at runtime. */
 export type Env = Record<string, unknown>;
@@ -33,7 +33,11 @@ const CONFIRM_SCHEMA: ElicitRequestFormParams["requestedSchema"] = {
   required: ["confirm"],
 };
 
-export function createServer(env: Env, fetchImpl: typeof fetch = fetch): McpServer {
+/**
+ * `user` is set when the server signs users in with OAuth: tool calls then reach
+ * the backend with that user's own token instead of a shared secret.
+ */
+export function createServer(env: Env, fetchImpl: typeof fetch = fetch, user?: UserCredentials): McpServer {
   const server = new McpServer(
     { name: APP.name, version: APP.version },
     { instructions: APP.instructions },
@@ -51,7 +55,7 @@ export function createServer(env: Env, fetchImpl: typeof fetch = fetch): McpServ
       async (args: Args, ctx: ServerContext) => {
         const gate = tool.confirmation ? confirmationGate(tool, args, ctx) : undefined;
         if (gate) return gate;
-        return callBackend(tool, args, env, fetchImpl);
+        return callBackend(tool, args, env, fetchImpl, user);
       },
     );
   }
@@ -113,7 +117,13 @@ function backendBaseUrl(env: Env): string | undefined {
   return /^https?:\/\//.test(value) ? value.replace(/\/+$/, "") : undefined;
 }
 
-async function callBackend(tool: ToolDefinition, args: Args, env: Env, fetchImpl: typeof fetch): Promise<CallToolResult> {
+async function callBackend(
+  tool: ToolDefinition,
+  args: Args,
+  env: Env,
+  fetchImpl: typeof fetch,
+  user: UserCredentials | undefined,
+): Promise<CallToolResult> {
   const base = backendBaseUrl(env);
   if (!base) return toolError("The server is not configured yet: set BACKEND_BASE_URL to the backend's URL.");
 
@@ -144,6 +154,9 @@ async function callBackend(tool: ToolDefinition, args: Args, env: Env, fetchImpl
       return toolError(`The server is not configured yet: set the ${auth.secret} secret.`);
     }
     headers.authorization = `Bearer ${token}`;
+  } else if (auth.type === "oauth") {
+    if (!user?.backendToken) return toolError("Sign in again: this request carries no backend credentials.");
+    headers.authorization = `Bearer ${user.backendToken}`;
   }
 
   let response: Response;
@@ -224,7 +237,7 @@ function describeFailure(status: number, text: string): string {
   detail = detail.slice(0, 300);
   if (status === 404) return `Not found (404)${detail ? `: ${detail}` : "."}`;
   if (status === 400 || status === 422) return `The backend rejected the arguments (${status})${detail ? `: ${detail}` : "."}`;
-  if (status === 401 || status === 403) return `The backend refused the request (${status}). Check the server's backend credentials.`;
+  if (status === 401 || status === 403) return `The backend refused the request (${status}). Check the server's backend credentials, or sign in again.`;
   if (status === 409) return `The request conflicts with the current state (409)${detail ? `: ${detail}` : "."}`;
   return `The backend failed (${status})${detail ? `: ${detail}` : "."}`;
 }

@@ -1,0 +1,269 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-24T12:32:31.042Z",
+  "sources": {
+    "apple-siri-ai-preview": {
+      "value": "1569029c9bcf1a5d",
+      "sections": {
+        "(top)": "5758969d0e418f57",
+        "# Siri AI Developer Preview": "7ce010a6b9f6ff69",
+        "## Overview": "95f0c42b13d331f5",
+        "## Developer Preview availability": "adff1dcae1ef9ed0",
+        "## Custom actions, content, and snippets in Siri": "aef798f3a3749a67",
+        "## Extra guidance for complex actions": "ce8c78f24500ee64",
+        "## Siri Integration Advisor and Siri Evaluations": "538b817811dfe490",
+        "## Topics": "e3b0c44298fc1c14",
+        "### Getting started": "73b7582ac23b18a0",
+        "### Tool support": "d9c210f2e4a5f69d",
+        "### Entity support": "6a7857e9fd128dae"
+      },
+      "since": "2026-11-24"
+    },
+    "apple-custom-actions": {
+      "value": "36c633543d1826ff",
+      "sections": {
+        "(top)": "15fc9bef6c0e48fe",
+        "# Bringing custom actions and content to Siri": "4455f25d2082e6a9",
+        "## Overview": "be9f918e00f976ee",
+        "## Turn custom intents into tools Siri can use": "3cb6719e1ce82b14",
+        "## Provide additional information for app intents": "c9688a3c65c131d2",
+        "## Add information to your app entities": "65ec6fe9cb7a66f9",
+        "## Let Siri fill an app entity from a request": "7c033e2213814dee",
+        "## Enable Siri to find your app entities": "ba7996cbca6d6c93",
+        "## Provide onscreen context": "2c82b175d0f1bad1",
+        "## Make actions discoverable": "65e883f95b3115c1",
+        "## Offer a transferable representation of your app entities": "86ba55dcb84d2c6f",
+        "## Verify your app’s integration with Siri AI": "f33577716055fdaa"
+      },
+      "since": "2026-11-24"
+    },
+    "apple-app-skills": {
+      "value": "f1de59f817876136",
+      "sections": {
+        "(top)": "dca52cd0de6c34a5",
+        "# Orchestrating complex actions with app skills": "3de68f7f14a7f63f",
+        "## Overview": "1563426c42fa47c6",
+        "## Add the skills bundle to your Xcode project": "4baf8ef906967682",
+        "## Create a skill file": "3bfa5eb98b883f98",
+        "## Specify the skill’s metadata": "150aaea9b2cea7c9",
+        "## Provide guidance to Siri in the Markdown body": "0a5f4c04804a32ee",
+        "## Verify your app skills": "5975b6715176b36c"
+      },
+      "since": "2026-11-24"
+    },
+    "android-appfunctions-release": {
+      "value": "1.0.0",
+      "since": "2026-11-24"
+    },
+    "android-appfunctions-overview": {
+      "value": "9c2ebb102ea294d2",
+      "sections": {
+        "(top)": "631623af7ffd45a7",
+        "## Example use cases": "64e6cf41f56eeff3",
+        "## How AppFunctions work": "685b0eb53168c28b",
+        "## Samples, skill, and testing tools": "b467749c4a145702",
+        "## Frequently asked questions (FAQs)": "0545a3305ebd817e"
+      },
+      "since": "2026-11-24"
+    },
+    "android-add-appfunctions": {
+      "value": "ae1b6dfc2a08cbce",
+      "sections": {
+        "(top)": "450ed7111bbdffd6",
+        "## Version compatibility": "3f36c79efc0ba295",
+        "### Dependencies": "f556c1793d7dddcc",
+        "## Implement AppFunctions logic": "7984e423105c15ac",
+        "### Key points about the code": "582301e44838e25d",
+        "## Declare the AppFunction service in your manifest": "1bdf0ec99fdc70d7",
+        "## Optional: Toggle AppFunction availability at runtime": "2b7db8bb3f91f2cb",
+        "## Considerations of types of functionalities to make available": "52e7fdae818e633f",
+        "## Verify AppFunction integration": "7b07c998ec79f590",
+        "### Test your function": "36bcba46b750cfb8",
+        "### Test with agents": "10a44d5e7c242ed7",
+        "## Migrate from lower API versions": "dbb581b22a5827c0",
+        "## Android skills": "bed885933844f0f1",
+        "### Implement AppFunctions": "b266458c3b64fbfc"
+      },
+      "since": "2026-11-24"
+    },
+    "android-quality-guidelines": {
+      "value": "a8d3ee17660a5677",
+      "sections": {
+        "(top)": "7f48eb23cb121cc4",
+        "## Function description guidelines": "957e1c13559a7433",
+        "### Write concise, unambiguous AppFunction descriptions": "ebf88b3b3166d268",
+        "### Write with encapsulation in mind": "4168726d5de12ee5",
+        "## Permissible actions and data sharing": "91090467c359eecb",
+        "## Parameter and return value design": "f7a9261d723e3a44",
+        "### Optional parameters": "9830f53e4122b9fe",
+        "### Updates to existing resources": "73554dce8e5fd847",
+        "## Error handling": "f9b7cc966872534d"
+      },
+      "since": "2026-11-24"
+    },
+    "mcp-spec-revision": {
+      "value": "2026-07-28",
+      "since": "2026-11-24"
+    },
+    "mcp-spec-tools": {
+      "value": "25f5eb0c0556a0ac",
+      "sections": {
+        "(top)": "c80e761b96e70d18",
+        "## User Interaction Model": "5b0d938b2115f068",
+        "## Capabilities": "6bf3b774e039cf69",
+        "## Protocol Messages": "e3b0c44298fc1c14",
+        "### Listing Tools": "bfec93e83216ae49",
+        "### Calling Tools": "d6b67a8c173d1281",
+        "### Input Required Tool Results": "fb2051f3d2aa91d5",
+        "### List Changed Notification": "8bd4128a59716ea5",
+        "## Message Flow": "f51031eed707f986",
+        "## Data Types": "e3b0c44298fc1c14",
+        "### Tool": "4013256d47fc96a3",
+        "#### Tool Names": "53d1d868454e8980",
+        "#### x-mcp-header": "0ad44e73f8fcf241",
+        "### Tool Result": "3d6566aa49b3858c",
+        "#### Text Content": "262a6d6c46872ec2",
+        "#### Image Content": "a6c83fa6c107770b",
+        "#### Audio Content": "52bf3c051781952b",
+        "#### Resource Links": "12419211955825f1",
+        "#### Embedded Resources": "ccbdda3366e76260",
+        "#### Structured Content": "756e1042bbb864a0",
+        "#### Output Schema": "9aba41029abb5c6d",
+        "### Schema Examples": "e3b0c44298fc1c14",
+        "#### Tool with default 2020-12 schema:": "8aeb900a9ca7b869",
+        "#### Tool with explicit draft-07 schema:": "bbbec3c6dcf7ad5b",
+        "#### Tool with no parameters:": "7e8609479cf890c9",
+        "## Stateful Tools": "b211f67efaaf30ae",
+        "## Error Handling": "fa60ecec5418ae0f",
+        "## Security Considerations": "9763955940d07468"
+      },
+      "since": "2026-11-24"
+    },
+    "mcp-spec-authorization": {
+      "value": "4c49a2a2e4805c59",
+      "sections": {
+        "(top)": "7d8e54c01673938a",
+        "## Introduction": "e3b0c44298fc1c14",
+        "### Purpose and Scope": "2b9c6b8267d2479a",
+        "### Protocol Requirements": "306d719d7853d08d",
+        "### Standards Compliance": "12d0c6a49aae8914",
+        "## Roles": "517ca75adbce2957",
+        "## Overview": "3c45670285e25ba9",
+        "## Authorization Server Discovery": "dba868a0a5f423a4",
+        "## Client Registration": "73b8dcbde0ed93e3",
+        "## Scope Selection Strategy": "a99274751fdd6d3c",
+        "## Authorization Flow Steps": "cee8730ddde39ffc",
+        "### Authorization Response Validation": "37321745d410539b",
+        "## Resource Parameter Implementation": "4668587a7e26e81a",
+        "### Canonical Server URI": "1c633a04171e75a4",
+        "## Access Token Usage": "e3b0c44298fc1c14",
+        "### Token Requirements": "714faad7d4b6c2a5",
+        "### Token Handling": "9146576eb904c76e",
+        "## Refresh Tokens": "85126e5b53640c05",
+        "## Error Handling": "9ec43cd08735e4a9",
+        "### Scope Challenge Handling": "7f4f12ab5cec2d9c",
+        "#### Runtime Insufficient Scope Errors": "fffcc9c1bd30d6fd",
+        "#### Step-Up Authorization Flow": "24a8cf635c85ffcb",
+        "## Security Considerations": "4dce4fb99a54c31b",
+        "## MCP Authorization Extensions": "fecce54444158bea"
+      },
+      "since": "2026-11-24"
+    },
+    "mcp-spec-streamable-http": {
+      "value": "cd5ab187a4bd52fc",
+      "sections": {
+        "(top)": "9bd0dbf12d9f6d7e",
+        "## Security & Endpoint": "fd136f39cfd5be66",
+        "## Sending Messages": "65bc6d477c65a1cb",
+        "## Receiving Messages": "5959a541071e985c",
+        "## Message Flow": "8f67f137b4ac2df5",
+        "## Cancellation": "86917f8eeddf7734",
+        "## Request Metadata": "35f8a3e4b9b5c9a7",
+        "### Protocol Version Header": "f0b115f6e00a9d47",
+        "### Standard Request Headers": "1a7f4d68f81e2185",
+        "### Custom Headers from Tool Parameters": "bc28efc0ca3c4d76",
+        "#### Schema Extension": "a626405a7c4ef24a",
+        "#### Value Encoding": "2527151a7e69769e",
+        "#### Client Behavior": "7e08062a4995e8b9",
+        "#### Server Behavior for Custom Headers": "ad0ba94fa1e604a6",
+        "### Case Sensitivity": "ed0573b9853b6939",
+        "### Server Validation": "7f60355775f4c8bf",
+        "## Backward Compatibility": "44d238f7c64456ed",
+        "### Earlier Streamable HTTP Revisions": "bd53ef2a976bfa8e",
+        "### HTTP+SSE Transport (2024-11-05)": "9269774a2ea3fa7d"
+      },
+      "since": "2026-11-24"
+    },
+    "npm-mcp-server": {
+      "value": "2.4.0",
+      "since": "2026-11-24"
+    },
+    "npm-mcp-client": {
+      "value": "2.4.0",
+      "since": "2026-11-24"
+    },
+    "npm-mcp-sdk-legacy": {
+      "value": "1.32.2",
+      "since": "2026-11-24"
+    },
+    "npm-agents": {
+      "value": "0.34.0",
+      "since": "2026-11-24"
+    },
+    "npm-wrangler": {
+      "value": "4.167.0",
+      "since": "2026-11-24"
+    },
+    "npm-workers-types": {
+      "value": "5.20261124.1",
+      "since": "2026-11-24"
+    },
+    "npm-workers-oauth-provider": {
+      "value": "1.3.0",
+      "since": "2026-11-24"
+    },
+    "cloudflare-mcp-handler": {
+      "value": "7c8aedf48705f631",
+      "sections": {
+        "(top)": "922f80812a5fd780",
+        "# MCP Server": "7d27b7f6b52cb5da",
+        "## Install dependencies": "c051ba5d56131747",
+        "## `createMcpHandler`": "6333e917ac430b8f",
+        "### Parameters": "77b0d25f93969eaf",
+        "### Example": "7bbcc129e6d9160b",
+        "### `CreateMcpHandlerOptions`": "5f0853af04c8ac19",
+        "### Factory lifecycle": "0a6c7dfad097a49e",
+        "### Elicitation with a stateless handler": "f5374ff46721ed8b",
+        "### Origin validation and CORS": "95368d171ff8d14e",
+        "### Compatibility with legacy clients": "5ea432c5690204dd",
+        "### Return value": "95ef84424b8073a2",
+        "#### Invoke the handler": "aeb4ed0609cd0cad",
+        "#### Publish list and resource changes": "a984e3a8e1d81af3",
+        "#### Keep one handler for notifications": "e306f7b1b4a17039",
+        "## Authentication context": "eca2947207793537",
+        "## Related resources": "e3b0c44298fc1c14",
+        "### [Migrate to MCP SDK v2](https://developers.cloudflare.com/agents/model-context-protocol/guides/migrate-to-mcp-sdk-v2/)": "829ab43ce508c1e9",
+        "### [Secure MCP servers](https://developers.cloudflare.com/agents/model-context-protocol/guides/securing-mcp-server/)": "1fac885b5119513e",
+        "## On this page": "875b1c13bec952b1"
+      },
+      "since": "2026-11-24"
+    },
+    "cloudflare-securing-mcp": {
+      "value": "47e666f58485f345",
+      "sections": {
+        "(top)": "f16ef2655a9e0855",
+        "# Securing MCP servers": "404fdf385719e25e",
+        "## Consent page": "f71b30c56af1485f",
+        "## Sign in through a third-party provider": "255ba34f7d7689db",
+        "## Checks on the MCP server": "5aae7c6b16ea9159",
+        "## Security checklist": "c3d3815f86aec3f7",
+        "## Next steps": "e3b0c44298fc1c14",
+        "### [MCP authorization](https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/)": "1206d67abf0b062f",
+        "### [Build a remote MCP server](https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/)": "6027cb7bcbb4dc01",
+        "### [MCP security best practices](https://modelcontextprotocol.io/specification/draft/basic/security_best_practices)": "fcaa1c6589037f6d",
+        "## On this page": "5eefe3e8f4a1cdc4"
+      },
+      "since": "2026-11-24"
+    }
+  }
+}

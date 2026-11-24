@@ -28,6 +28,9 @@ times, badly.
 3. **Check.** `omnintent validate` applies the [rule book](SPEC.md): unique snake_case names, real
    descriptions, at least two sample utterances per action, and confirmation for destructive and
    payment actions. `omnintent test` checks that each utterance matches its expected arguments.
+   `omnintent agent-test` plays the utterances to Claude acting as an agent with your tools and
+   reports which action it chose, with which arguments; `test --plan` writes the same cases for
+   Siri (a SiriEvaluations test) and Android (adb and an agent checklist).
 4. **Generate.** `omnintent generate` writes three things:
    - Swift `@AppIntent(.tool)` intents and entities.
    - A Kotlin `AppFunctionService` with KDoc written from your descriptions.
@@ -50,24 +53,35 @@ node packages/cli/dist/cli.js validate examples/todo/omnintent.json
 node packages/cli/dist/cli.js test examples/todo/omnintent.json --plan /tmp/todo-plan
 node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all --out /tmp/todo-out
 
+# See which action an agent picks for each sample (needs ANTHROPIC_API_KEY; makes API calls).
+node packages/cli/dist/cli.js agent-test examples/todo/omnintent.json --fixtures examples/todo/tester-fixtures.json
+
 # Draft a manifest from an OpenAPI file (set ANTHROPIC_API_KEY to let Claude refine it).
 node packages/cli/dist/cli.js discover examples/todo/openapi.yaml --out /tmp/omnintent.json
 
-# Run the generated MCP server against the mock backend.
-PORT=8788 MOCK_BACKEND_TOKEN=dev node examples/todo/mock-backend/server.mjs &
+# Run the generated MCP server against the mock backend, which has its own sign-in page.
+PORT=8788 node examples/todo/mock-backend/server.mjs &
 cd examples/todo/generated/mcp
-BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run dev (wrangler)
-# MCP endpoint: http://127.0.0.1:8787/mcp
+PORT=8787 MCP_SERVER_URL=http://127.0.0.1:8787 BACKEND_OAUTH_CLIENT_ID=todo-mcp \
+  BACKEND_OAUTH_CLIENT_SECRET=todo-mcp-secret npm run start:node   # or: npm run dev (wrangler)
+# MCP endpoint: http://127.0.0.1:8787/mcp. An MCP client that supports OAuth opens a consent
+# page, then the mock sign-in (any user name works). Each user gets their own to-do lists.
 ```
 
-Run everything (build, type checks, 81 tests including end-to-end MCP on Node and workerd):
+The example signs each person in with OAuth 2.1 (SPEC.md section E.5). A backend without its own
+OAuth server can use one shared token instead (section E.4).
+
+Run everything (build, type checks, 192 tests including end-to-end MCP with OAuth sign-in on Node and
+workerd):
 
 ```sh
 npm test
 ```
 
 The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlinc.sh` downloads it
-from GitHub releases into `.tools/`.
+from GitHub releases into `.tools/`. That check uses stubs; `verify/android` builds the generated Kotlin
+with the real AppFunctions compiler and runs it on an Android emulator (on GitHub Actions, or locally
+with the Android SDK; see its README).
 
 On a Mac with Xcode, the tests also type-check the generated Swift with Xcode's Swift compiler and
 iOS SDK. To build it inside a throwaway iOS app target with `xcodebuild` (which also runs Xcode's
@@ -88,6 +102,10 @@ With an SDK older than iOS 27, both checks first remove `@AppIntent(.tool)` and 
 | `omnintent generate <manifest> --target swift\|kotlin\|mcp\|all --out <dir>` | Deterministic code generation. |
 | `omnintent discover <openapi-file\|dir> [--out omnintent.json] [--no-ai] [--model <id>]` | Drafts a manifest. It never writes an invalid one. |
 | `omnintent test <manifest> [--plan <dir>]` | Utterance checks, plus test plans for SiriEvaluations, adb and MCP. |
+| `omnintent build [--since <ref>] [--dry-run <dir>]` | Builder agent: regenerates code, has Claude wire it into your app, and opens one draft pull request per platform. Never merges. See `docs/BUILDER.md`. |
+| `omnintent agent-test <manifest> [--server <url>] [--platform mcp\|ios\|android] [--runs <n>]` | Claude plays the agent; reports the action and arguments it chose for each sample. `--import` reads results recorded on Siri or Android. |
+| `omnintent watch [--update-state] [--report <file>]` | Watcher agent: checks Apple, Android, MCP and Cloudflare sources against `docs/RESEARCH.md` and reports what moved. Runs weekly in GitHub Actions and opens an issue. |
+| `omnintent submit-prep <manifest> --out <dir>` | Submission helper: drafts TestFlight notes, a Google Connected Console entry and an MCP connector listing. It never sends anything. |
 
 ## Repository
 
@@ -96,9 +114,13 @@ SPEC.md                        Omnintent Rule Book v0.1 (the open standard)
 schema/omnintent.schema.json   JSON Schema for omnintent.json
 packages/cli/                  The omnintent CLI (TypeScript)
 examples/todo/                 Example manifest, OpenAPI file, mock backend, generated output
+verify/android/                Builds generated Kotlin with the real AppFunctions compiler
 docs/RESEARCH.md               Platform research with sources (November 2026)
 docs/ARCHITECTURE.md           Components and the agentic roadmap
+docs/BUILDER.md                The builder agent: setup, safety, GitHub Actions example
 docs/LIMITATIONS.md            What is and is not verified
+docs/watch-state.json          The watcher agent's last snapshot of the sources it tracks
+.github/workflows/watcher.yml  Weekly watcher run that opens issues and snapshot pull requests
 ```
 
 ## Safety in one table

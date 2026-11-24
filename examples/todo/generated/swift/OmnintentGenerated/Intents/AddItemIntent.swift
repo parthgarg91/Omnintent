@@ -19,7 +19,7 @@ struct AddItemIntent: AppIntent {
     @Parameter(title: "Title", description: LocalizedStringResource("What needs to be done, for example \"Buy milk\"."))
     var title: String
 
-    @Parameter(title: "Due Date", description: LocalizedStringResource("The day the item is due, as YYYY-MM-DD. Omit when the user gives no date."))
+    @Parameter(title: "Due Date", description: LocalizedStringResource("The day the item is due. Omit when the user gives no date."))
     var dueDate: Date?
 
     func perform() async throws -> some IntentResult & ReturnsValue<TodoItemEntity> {

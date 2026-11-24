@@ -21,6 +21,3 @@ class FakeTodoHandlers : OmnintentHandlers {
 class FakeApp : Application(), OmnintentHandlersProvider {
     override val omnintentHandlers: OmnintentHandlers = FakeTodoHandlers()
 }
-
-/** The KSP compiler normally generates this subclass from the entry point. */
-class TodoExampleAppFunctionService : BaseTodoExampleAppFunctionService()

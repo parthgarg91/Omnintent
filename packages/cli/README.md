@@ -9,6 +9,7 @@ omnintent validate omnintent.json
 omnintent generate omnintent.json --target all --out generated
 omnintent discover openapi.yaml --out omnintent.json
 omnintent test omnintent.json --plan test-plan
+omnintent build --since HEAD~1 --dry-run plan   # builder agent, see docs/BUILDER.md
 omnintent agent-test omnintent.json --server <your-staging-mcp-url> --runs 3 --report agent-report.md
 omnintent watch --report watch-report.md          # run from the repository root
 omnintent submit-prep omnintent.json --out submission
@@ -18,8 +19,10 @@ Environment:
 
 | Variable | Used by | Meaning |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | `discover`, `agent-test` | Enables the Claude path (model `claude-opus-5-5`). Required by `agent-test` except with `--import`. |
-| `ANTHROPIC_BASE_URL` | `discover`, `agent-test` | Alternative API origin, for gateways or tests. |
+| `ANTHROPIC_API_KEY` | `discover`, `build`, `agent-test` | Enables the Claude path (model `claude-opus-5-5`). Required by `agent-test` except with `--import`. |
+| `ANTHROPIC_BASE_URL` | `discover`, `build`, `agent-test` | Alternative API origin, for gateways or tests. |
+| `GITHUB_TOKEN` / `GH_TOKEN` | `build` | Creates `omnintent/build/*` branches and opens pull requests. |
+| `GITHUB_API_URL` | `build` | GitHub API origin (GitHub Enterprise, tests). |
 | `MCP_ACCESS_TOKEN` | `agent-test --server` | Bearer token for the MCP server under test (another variable with `--token-env`). |
 
 The library API (`import { validateManifest, generate, discover } from "omnintent"`) mirrors the

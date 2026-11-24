@@ -12,3 +12,22 @@ export { draftWithAi, proposalToManifest, PROPOSAL_SCHEMA, DEFAULT_MODEL, ANTHRO
 export { testManifest, testPlan, formatReport } from "./testcmd.js";
 export { SAFETY, actionAuth, androidRule, needsConfirmation, mcpConfirmation, isEnabledFor, skillsFor } from "./safety.js";
 export { manifestSchema, mcpInputSchema, mcpOutputSchema } from "./schema.js";
+export {
+  runBuilder,
+  formatBuildReport,
+  branchName,
+  pullRequestBody,
+  parseBuilderConfig,
+  loadBuilderConfig,
+  GitHubRest,
+  diffManifests,
+  WIRING_SCHEMA,
+  checkProposal,
+  type BuildOptions,
+  type BuildReport,
+  type PlatformReport,
+  type BuilderConfig,
+  type PlatformConfig,
+  type GitHost,
+  type ManifestChanges,
+} from "./builder/index.js";

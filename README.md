@@ -77,6 +77,7 @@ from GitHub releases into `.tools/`.
 | `omnintent generate <manifest> --target swift\|kotlin\|mcp\|all --out <dir>` | Deterministic code generation. |
 | `omnintent discover <openapi-file\|dir> [--out omnintent.json] [--no-ai] [--model <id>]` | Drafts a manifest. It never writes an invalid one. |
 | `omnintent test <manifest> [--plan <dir>]` | Utterance checks, plus test plans for SiriEvaluations, adb and MCP. |
+| `omnintent build [--since <ref>] [--dry-run <dir>]` | Builder agent: regenerates code, has Claude wire it into your app, and opens one draft pull request per platform. Never merges. See `docs/BUILDER.md`. |
 
 ## Repository
 
@@ -87,6 +88,7 @@ packages/cli/                  The omnintent CLI (TypeScript)
 examples/todo/                 Example manifest, OpenAPI file, mock backend, generated output
 docs/RESEARCH.md               Platform research with sources (November 2026)
 docs/ARCHITECTURE.md           Components and the agentic roadmap
+docs/BUILDER.md                The builder agent: setup, safety, GitHub Actions example
 docs/LIMITATIONS.md            What is and is not verified
 ```
 

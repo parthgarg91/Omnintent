@@ -39,19 +39,36 @@ protocol OmnintentHandlers: Sendable {
 
 /// Holds the registered handlers. Generated intents and entity queries read from here.
 enum OmnintentRuntime {
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var current: (any OmnintentHandlers)?
+    private static let storage = OmnintentHandlerStorage()
 
     /// Call once at app launch, before any intent runs.
     static func register(_ handlers: any OmnintentHandlers) {
-        lock.withLock { current = handlers }
+        storage.set(handlers)
     }
 
     static func handlers() throws -> any OmnintentHandlers {
-        guard let handlers = lock.withLock({ current }) else {
+        guard let handlers = storage.get() else {
             throw OmnintentError.handlersNotRegistered
         }
         return handlers
+    }
+}
+
+/// Lock-protected storage, so registration is safe under Swift 6 strict concurrency.
+private final class OmnintentHandlerStorage: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: (any OmnintentHandlers)?
+
+    func set(_ handlers: any OmnintentHandlers) {
+        lock.lock()
+        defer { lock.unlock() }
+        current = handlers
+    }
+
+    func get() -> (any OmnintentHandlers)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return current
     }
 }
 

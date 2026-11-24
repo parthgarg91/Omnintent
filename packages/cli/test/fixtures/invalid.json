@@ -1,0 +1,18 @@
+{
+  "omnintent": "0.1",
+  "app": {
+    "name": "Broken",
+    "slug": "broken",
+    "description": "A manifest that breaks two rules on purpose."
+  },
+  "actions": [
+    {
+      "name": "getThings",
+      "title": "Get Things",
+      "description": "Lists the user's things.",
+      "safety": "read",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "examples": [{ "utterance": "Show my things", "arguments": {} }]
+    }
+  ]
+}

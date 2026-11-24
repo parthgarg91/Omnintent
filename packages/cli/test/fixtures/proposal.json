@@ -1,0 +1,84 @@
+{
+  "app": {
+    "name": "Todo Example",
+    "description": "A personal to-do app with named lists of items.",
+    "instructions": "Use the list items tool to find an item ID before deleting it."
+  },
+  "entities": [
+    {
+      "name": "TodoItem",
+      "title": "To-do Item",
+      "description": "One task on a to-do list.",
+      "privacy": "personal",
+      "idProperty": "id",
+      "displayProperty": "title",
+      "properties": [
+        { "name": "id", "type": "string", "format": "none", "title": "ID", "description": "The unique ID of the item.", "required": true, "enumValues": [], "visibility": "public", "privacy": "inherit" },
+        { "name": "title", "type": "string", "format": "none", "title": "Title", "description": "What needs to be done.", "required": true, "enumValues": [], "visibility": "public", "privacy": "inherit" },
+        { "name": "done", "type": "boolean", "format": "none", "title": "Done", "description": "Whether the item is complete.", "required": true, "enumValues": [], "visibility": "public", "privacy": "inherit" },
+        { "name": "notes", "type": "string", "format": "none", "title": "Notes", "description": "App-internal notes.", "required": false, "enumValues": [], "visibility": "internal", "privacy": "inherit" }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "name": "add_item",
+      "title": "Add Item",
+      "description": "Adds a new item to a to-do list and returns the created item.",
+      "safety": "write",
+      "idempotent": false,
+      "openWorld": false,
+      "confirmationPrompt": "",
+      "params": [
+        { "name": "listId", "type": "string", "format": "none", "title": "List", "description": "The ID of the list, for example \"groceries\".", "required": true, "enumValues": [], "entity": "", "location": "path" },
+        { "name": "title", "type": "string", "format": "none", "title": "Title", "description": "What needs to be done, for example \"Buy milk\".", "required": true, "enumValues": [], "entity": "", "location": "body" },
+        { "name": "dueDate", "type": "string", "format": "date", "title": "Due Date", "description": "The due day, for example 2027-01-31.", "required": false, "enumValues": [], "entity": "", "location": "body" }
+      ],
+      "output": { "kind": "entity", "entity": "TodoItem", "fields": [] },
+      "backend": { "method": "POST", "path": "/lists/{listId}/items" },
+      "examples": [
+        { "utterance": "Add milk to my groceries list", "arguments": [{ "name": "listId", "value": "groceries" }, { "name": "title", "value": "milk" }] },
+        { "utterance": "Add call mom to my home list by 2027-01-31", "arguments": [{ "name": "listId", "value": "home" }, { "name": "title", "value": "call mom" }, { "name": "dueDate", "value": "2027-01-31" }] }
+      ]
+    },
+    {
+      "name": "list_items",
+      "title": "List Items",
+      "description": "Lists the items on a to-do list, optionally only the open or done ones.",
+      "safety": "read",
+      "idempotent": true,
+      "openWorld": false,
+      "confirmationPrompt": "",
+      "params": [
+        { "name": "listId", "type": "string", "format": "none", "title": "List", "description": "The ID of the list, for example \"groceries\".", "required": true, "enumValues": [], "entity": "", "location": "path" },
+        { "name": "status", "type": "string", "format": "none", "title": "Status", "description": "Which items to return.", "required": false, "enumValues": ["open", "done", "all"], "entity": "", "location": "query" },
+        { "name": "limit", "type": "integer", "format": "none", "title": "Limit", "description": "The most items to return, for example 10.", "required": false, "enumValues": [], "entity": "", "location": "query" }
+      ],
+      "output": { "kind": "entity_list", "entity": "TodoItem", "fields": [] },
+      "backend": { "method": "GET", "path": "/lists/{listId}/items" },
+      "examples": [
+        { "utterance": "What's on my groceries list?", "arguments": [{ "name": "listId", "value": "groceries" }] },
+        { "utterance": "Show the first 5 done items on my work list", "arguments": [{ "name": "listId", "value": "work" }, { "name": "status", "value": "done" }, { "name": "limit", "value": "5" }] }
+      ]
+    },
+    {
+      "name": "delete_item",
+      "title": "Delete Item",
+      "description": "Deletes a to-do item permanently.",
+      "safety": "destructive",
+      "idempotent": true,
+      "openWorld": false,
+      "confirmationPrompt": "Delete this item permanently?",
+      "params": [
+        { "name": "itemId", "type": "string", "format": "none", "title": "Item", "description": "The ID of the item to delete.", "required": true, "enumValues": [], "entity": "TodoItem", "location": "path" }
+      ],
+      "output": { "kind": "none", "entity": "", "fields": [] },
+      "backend": { "method": "DELETE", "path": "/items/{itemId}" },
+      "examples": [
+        { "utterance": "Delete the milk item", "arguments": [{ "name": "itemId", "value": "item-1" }] },
+        { "utterance": "Remove the eggs from my list for good", "arguments": [{ "name": "itemId", "value": "item-2" }] }
+      ]
+    }
+  ],
+  "skills": []
+}

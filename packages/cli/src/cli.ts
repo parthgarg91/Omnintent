@@ -95,7 +95,13 @@ async function main(argv: string[]): Promise<void> {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       const log = (m: string) => process.stderr.write(`${m}\n`);
       if (!apiKey && !values["no-ai"]) log("ANTHROPIC_API_KEY is not set: using the deterministic OpenAPI path only.");
-      const result = await discover(input, { apiKey, useAi: !values["no-ai"], model: values.model, log });
+      const result = await discover(input, {
+        apiKey,
+        baseUrl: process.env.ANTHROPIC_BASE_URL,
+        useAi: !values["no-ai"],
+        model: values.model,
+        log,
+      });
       const check = validateManifest(result.manifest);
       if (!check.ok) {
         fail(`the drafted manifest is not valid, so nothing was written:\n${formatIssues(check.issues)}`);

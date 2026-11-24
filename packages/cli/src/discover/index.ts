@@ -12,6 +12,7 @@ import { draftFromOpenApi, loadOpenApi, openApiSummary } from "./openapi.js";
 
 export interface DiscoverOptions {
   apiKey?: string;
+  baseUrl?: string;
   useAi?: boolean;
   model?: string;
   fetchImpl?: typeof fetch;
@@ -65,7 +66,7 @@ export async function discover(input: string, opts: DiscoverOptions = {}): Promi
     baseUrl: draft?.backend?.baseUrl ?? "<YOUR_BACKEND_URL>",
     auth: draft?.backend?.auth ?? { type: "bearer", secret: "BACKEND_TOKEN" },
   };
-  const aiOpts: AiOptions = { apiKey: opts.apiKey!, model: opts.model, fetchImpl: opts.fetchImpl, log };
+  const aiOpts: AiOptions = { apiKey: opts.apiKey!, baseUrl: opts.baseUrl, model: opts.model, fetchImpl: opts.fetchImpl, log };
   const result = await draftWithAi(context, draft, base, aiOpts);
   notes.push(`Claude drafted the manifest in ${result.attempts} attempt(s). Review every description, safety level and utterance before you generate.`);
   return { manifest: result.manifest, mode: "ai", notes };

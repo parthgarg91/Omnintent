@@ -17,7 +17,7 @@ import type {
 } from "../manifest.js";
 import { validateManifest, type Issue } from "../validate.js";
 
-export const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 export const ANTHROPIC_VERSION = "2026-10-21";
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
@@ -257,6 +257,8 @@ Follow the Omnintent Rule Book v0.1:
 
 export interface AiOptions {
   apiKey: string;
+  /** API origin; defaults to https://api.anthropic.com (ANTHROPIC_BASE_URL in the CLI). */
+  baseUrl?: string;
   model?: string;
   fetchImpl?: typeof fetch;
   maxRepairs?: number;
@@ -268,7 +270,8 @@ type Message = { role: "user" | "assistant"; content: string };
 
 export async function callClaude(messages: Message[], opts: AiOptions): Promise<string> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const response = await fetchImpl(ANTHROPIC_URL, {
+  const url = `${(opts.baseUrl ?? ANTHROPIC_BASE_URL).replace(/\/+$/, "")}/v1/messages`;
+  const response = await fetchImpl(url, {
     method: "POST",
     headers: {
       "x-api-key": opts.apiKey,

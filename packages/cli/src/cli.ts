@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { AGENT_COMMANDS, AGENT_HELP, submitPrepCommand, watchCommand } from "./agents/commands.js";
 import { discover } from "./discover/index.js";
 import { generate, parseTargets, writeFiles } from "./generators/index.js";
 import { CLI_VERSION, type Manifest } from "./manifest.js";
@@ -17,7 +18,7 @@ Usage:
   omnintent generate <omnintent.json> --target swift|kotlin|mcp|all --out <dir>
   omnintent discover <openapi-file|code-directory> [--out omnintent.json] [--no-ai] [--model <id>] [--force]
   omnintent test <omnintent.json> [--plan <dir>] [--json]
-
+${AGENT_HELP}
 Commands:
   validate  Check the manifest against the JSON Schema and the rule book.
   generate  Write Swift App Intents, Kotlin AppFunctions and/or an MCP server.
@@ -26,7 +27,7 @@ Commands:
             manifest is ever written.
   test      Check that sample utterances match their expected arguments.
             --plan writes test cases for SiriEvaluations, adb and MCP.
-`;
+${AGENT_COMMANDS}`;
 
 function fail(message: string): never {
   process.stderr.write(`omnintent: ${message}\n`);
@@ -60,6 +61,13 @@ async function main(argv: string[]): Promise<void> {
       "no-ai": { type: "boolean" },
       model: { type: "string" },
       force: { type: "boolean" },
+      research: { type: "string" },
+      state: { type: "string" },
+      "update-state": { type: "boolean" },
+      report: { type: "string" },
+      "report-json": { type: "string" },
+      only: { type: "string" },
+      platform: { type: "string" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -126,6 +134,16 @@ async function main(argv: string[]): Promise<void> {
         process.stdout.write(`Wrote test plan (${files.map((f) => f.path).join(", ")}) to ${values.plan}\n`);
       }
       if (!report.ok) process.exit(1);
+      return;
+    }
+    case "watch": {
+      await watchCommand(values);
+      return;
+    }
+    case "submit-prep": {
+      if (!input) fail("usage: omnintent submit-prep <omnintent.json> --out <dir>");
+      if (!values.out) fail("--out <dir> is required");
+      submitPrepCommand(loadValid(input, false), values.out, values.platform);
       return;
     }
     default:

@@ -9,6 +9,8 @@ omnintent validate omnintent.json
 omnintent generate omnintent.json --target all --out generated
 omnintent discover openapi.yaml --out omnintent.json
 omnintent test omnintent.json --plan test-plan
+omnintent watch --report watch-report.md          # run from the repository root
+omnintent submit-prep omnintent.json --out submission
 ```
 
 Environment:

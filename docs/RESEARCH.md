@@ -68,6 +68,12 @@ Apple documentation pages are fetched as Markdown by appending `.md` to the URL.
 - [`TransientAppEntity`](https://developer.apple.com/documentation/appintents/transientappentity.md):
   requires `init()`; not queried.
 
+**[App Store Connect: platform version information](https://developer.apple.com/help/app-store-connect/reference/platform-version-information)**
+(read for the submission helper)
+
+- App Review "Notes": "The Notes field can contain up to 4000 bytes."
+- "Description" and "What's New in this Version" are each limited to 4000 characters.
+
 ## Android: AppFunctions
 
 **[AppFunctions overview](https://developer.android.com/ai/appfunctions)**
@@ -278,6 +284,14 @@ Apple documentation pages are fetched as Markdown by appending `.md` to the URL.
 - **OpenAI ChatGPT.** The help article "Developer mode and MCP apps in ChatGPT"
   (help.openai.com/en/articles/12584461) appeared in search results, but fetching it failed. Nothing
   about ChatGPT ("dots" or developer mode) was verified first-hand.
+
+## How these notes are kept current
+
+The watcher agent (`omnintent watch`, run weekly by `.github/workflows/watcher.yml`) reads the
+version facts above straight out of this file and compares them with npm, the Jetpack release notes
+and the MCP docs configuration. It also compares the Apple, Android, MCP and Cloudflare pages above
+with its last snapshot (`docs/watch-state.json`). When something moves it opens an issue; a
+maintainer re-reads the source and updates this file with the new date.
 
 ## Environment facts that shaped verification
 

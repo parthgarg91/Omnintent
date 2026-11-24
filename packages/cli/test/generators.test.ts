@@ -163,11 +163,17 @@ describe("kotlin generator", () => {
     const optInService = file(optIn, `${dir}/BaseTodoExampleAppFunctionService.kt`);
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun deleteItem(");
     expect(optInService).toContain("@AppFunctionDeclaration(isEnabled = false, isDescribedByKDoc = true)\n    suspend fun shareList(");
+    // A payment-only app has nothing to expose, and the AppFunctions compiler rejects an
+    // entry point without functions, so only a README explaining why is written.
     const pay = generateKotlin(paymentManifest());
-    const payService = file(pay, "src/main/kotlin/com/example/coffee/omnintent/BaseCoffeeShopAppFunctionService.kt");
-    expect(payService).not.toContain("placeOrder");
-    const order = file(pay, "src/main/kotlin/com/example/coffee/omnintent/Order.kt");
-    expect(order).not.toContain("cardLast4");
+    expect(pay.map((f) => f.path)).toEqual(["README.md"]);
+    expect(file(pay, "README.md")).toContain("`place_order` (payment): moves money, so it is never exposed on Android.");
+  });
+
+  it("keeps sensitive properties out of serializable classes", () => {
+    const reading = file(generateKotlin(fieldNotesManifest()), "src/main/kotlin/com/example/fieldnotes/omnintent/Reading.kt");
+    expect(reading).toContain("val label: String,");
+    expect(reading).not.toContain("secret");
   });
 
   it("keeps internal properties out of serializable classes", () => {
@@ -185,6 +191,7 @@ describe("kotlin generator", () => {
     const gradle = file(files, "build.gradle.kts.snippet");
     expect(gradle).toContain('implementation("androidx.appfunctions:appfunctions:1.0.0")');
     expect(gradle).toContain('ksp("androidx.appfunctions:appfunctions-compiler:1.0.0")');
+    expect(gradle).toContain('implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")');
   });
 
   const kotlinc = [process.env.KOTLINC, resolve(REPO, ".tools/kotlinc/bin/kotlinc")].find((p) => p && existsSync(p));
@@ -195,7 +202,6 @@ describe("kotlin generator", () => {
       const sources: string[] = [];
       for (const [name, manifest] of [
         ["todo", loadExample()],
-        ["coffee", paymentManifest()],
         ["todo-optin", optInManifest()],
         ["field-notes", fieldNotesManifest()],
       ] as [string, Manifest][]) {

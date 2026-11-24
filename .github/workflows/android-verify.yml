@@ -52,7 +52,7 @@ jobs:
         run: node verify/android/prepare.mjs
 
       - name: Build with the real AppFunctions compiler
-        run: gradle -p verify/android assembleDebug --stacktrace
+        run: gradle -p verify/android assembleDebug --continue --stacktrace
 
       - name: Check the KSP output
         run: node verify/android/check.mjs

@@ -9,14 +9,13 @@ the test fixtures or this folder change.
 
 ## What it builds
 
-`prepare.mjs` writes one Android app module per manifest into `modules/` (not committed):
+`prepare.mjs` writes one Android app module per manifest that exposes at least one function into `modules/` (not committed):
 
 | Module | Manifest | Why |
 | --- | --- | --- |
 | `todo` | `examples/todo/omnintent.json` | The example, exactly as developers see it. |
 | `optin` | The example with `delete_item` and `share_list` opted in | `isEnabled = false`, `Unit` returns, `Uri` results. |
 | `fieldnotes` | `packages/cli/test/fixtures/field-notes.json` | Every parameter and result type: nullable scalars, defaults, `Long`, `Double`, `Instant`, `LocalDate`, `Uri`, primitive arrays, lists, enums. |
-| `coffee` | `packages/cli/test/fixtures/coffee-shop.json` | A payment-only app, so no function reaches Android. |
 
 Each module contains the generated `src/` unchanged, an `AndroidManifest.xml` built around the
 generated snippet, the test handlers from `packages/cli/test/fixtures/kotlin-impl`, and a small

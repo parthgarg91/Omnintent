@@ -11,6 +11,8 @@ import { HEADER, exampleValue, lines, lowerFirst, type GeneratedFile } from "./t
 
 export const APPFUNCTIONS_VERSION = "1.0.0";
 export const KSP_VERSION = "2.3.13";
+/** The generated service switches to Dispatchers.IO; androidx.appfunctions does not expose coroutines to apps. */
+export const COROUTINES_VERSION = "1.11.0";
 
 interface KotlinNames {
   packageName: string;
@@ -37,6 +39,10 @@ export function generateKotlin(manifest: Manifest): GeneratedFile[] {
   const dir = `src/main/kotlin/${names.servicePackage.replace(/\./g, "/")}`;
   const actions = manifest.actions.filter((a) => isEnabledFor(a, "android"));
   const files: GeneratedFile[] = [];
+
+  // The AppFunctions compiler rejects an entry point without functions
+  // ("Class must have at least one AppFunction"), so generate nothing to build.
+  if (!actions.length) return [{ path: "README.md", content: emptyReadme(manifest) }];
 
   for (const [name, entity] of Object.entries(manifest.entities ?? {})) {
     files.push({ path: `${dir}/${name}.kt`, content: dataClassFile(names, name, entity.description, agentVisibleProperties(entity), entity.required ?? []) });
@@ -427,6 +433,8 @@ function gradleSnippet(): string {
     "dependencies {",
     `    implementation("androidx.appfunctions:appfunctions:${APPFUNCTIONS_VERSION}")`,
     `    ksp("androidx.appfunctions:appfunctions-compiler:${APPFUNCTIONS_VERSION}")`,
+    "    // The generated service uses kotlinx.coroutines. Keep your own version if the app already has it.",
+    `    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${COROUTINES_VERSION}")`,
     "}",
   ]);
 }
@@ -484,6 +492,30 @@ function readme(manifest: Manifest, names: KotlinNames, actions: Action[]): stri
     firstAction ? adbExecute(manifest, names, firstAction) : false,
     firstAction ? "```" : false,
   ]);
+}
+
+function emptyReadme(manifest: Manifest): string {
+  return lines([
+    `# ${manifest.app.name}: Android AppFunctions (generated)`,
+    "",
+    HEADER,
+    "",
+    "Nothing was generated for Android: no action in the manifest can be exposed as an AppFunction.",
+    "",
+    ...manifest.actions.map((a) => `- \`${a.name}\` (${a.safety}): ${androidReason(a)}`),
+    "",
+    "AppFunctions give the app no confirmation step, so payment actions are never generated, and",
+    "destructive actions or writes that need confirmation are generated only when the manifest sets",
+    "`platforms.android.enabled: true`. The AppFunctions compiler also rejects a service with no",
+    "functions, so no service, data classes or manifest snippet are written.",
+  ]);
+}
+
+function androidReason(action: Action): string {
+  const rule = androidRule(action);
+  if (rule === "never") return "moves money, so it is never exposed on Android.";
+  if (rule === "opt-in") return "needs confirmation; set `platforms.android.enabled: true` to expose it, disabled until your app enables it.";
+  return "disabled in the manifest (`platforms.android.enabled: false`).";
 }
 
 export function adbExecute(manifest: Manifest, names: KotlinNames, action: Action, args?: Record<string, unknown>): string {

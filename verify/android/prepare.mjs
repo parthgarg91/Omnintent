@@ -17,7 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "../..");
 const fixtures = join(repo, "packages/cli/test/fixtures");
 const { generateKotlin, writeFiles } = await import(join(repo, "packages/cli/dist/index.js"));
-const { kotlinNames, APPFUNCTIONS_VERSION, KSP_VERSION } = await import(join(repo, "packages/cli/dist/generators/kotlin.js"));
+const { kotlinNames, APPFUNCTIONS_VERSION, KSP_VERSION, COROUTINES_VERSION } = await import(join(repo, "packages/cli/dist/generators/kotlin.js"));
 
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 const example = () => readJson(join(repo, "examples/todo/omnintent.json"));
@@ -32,7 +32,6 @@ const MODULES = [
   { name: "todo", manifest: example(), impl: "TodoExampleHandlers.kt", handlers: "FakeTodoHandlers" },
   { name: "optin", manifest: optIn, impl: "OptInHandlers.kt", handlers: "FakeOptInHandlers" },
   { name: "fieldnotes", manifest: readJson(join(fixtures, "field-notes.json")), impl: "FieldNotesHandlers.kt", handlers: "FakeFieldNotesHandlers" },
-  { name: "coffee", manifest: readJson(join(fixtures, "coffee-shop.json")), impl: "CoffeeShopHandlers.kt", handlers: "FakeCoffeeHandlers" },
 ];
 
 // The root build pins the versions under test; they must match what the generator tells developers to use.
@@ -104,6 +103,7 @@ for (const m of MODULES) {
       "dependencies {",
       `    implementation("androidx.appfunctions:appfunctions:${APPFUNCTIONS_VERSION}")`,
       `    ksp("androidx.appfunctions:appfunctions-compiler:${APPFUNCTIONS_VERSION}")`,
+      `    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:${COROUTINES_VERSION}")`,
       "}",
       "",
     ].join("\n"),

@@ -67,3 +67,42 @@ jobs:
             verify/android/modules/*/build/generated
             verify/android/modules/*/build/intermediates/merged_manifests
           if-no-files-found: ignore
+
+      - name: Keep the APKs for the device check
+        uses: actions/upload-artifact@v5
+        with:
+          name: android-verify-apks
+          path: |
+            verify/android/modules/*/expect.json
+            verify/android/modules/*/build.gradle.kts
+            verify/android/modules/*/build/outputs/apk/debug/*.apk
+
+  # Installs the apps on an Android 16 (API 36) emulator and calls the functions
+  # through `adb shell cmd app_function`, as the generated README tells developers to.
+  device:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: android-verify-apks
+          path: verify/android/modules
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the functions on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: sh verify/android/device-check.sh

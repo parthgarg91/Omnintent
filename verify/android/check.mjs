@@ -20,6 +20,22 @@ function find(dir, match, out = []) {
   return out;
 }
 
+// One line per function and parameter: XML type code, nullability, required, enum values.
+function summary(xml) {
+  const out = [];
+  for (const fn of xml.split("<appfunction>").slice(1)) {
+    const body = fn.split("</appfunction>")[0];
+    const id = body.match(/<id>([^<]*)<\/id>/)[1].split("#")[1];
+    out.push(`     ${id} enabledByDefault=${body.match(/<enabledByDefault>(\w+)/)?.[1]}`);
+    for (const p of body.split("<parameters>").slice(1).map((s) => s.split("</parameters>")[0])) {
+      const get = (tag) => p.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1];
+      const enums = [...p.matchAll(/<enumValues>([^<]*)<\/enumValues>/g)].map((m) => m[1]);
+      out.push(`       ${get("name")}: type=${get("type")} ref=${get("dataTypeReference") ?? "-"} nullable=${get("isNullable")} required=${get("isRequired")}${enums.length ? ` enum=${enums.join("|")}` : ""}`);
+    }
+  }
+  return out.join("\n");
+}
+
 let failed = false;
 const fail = (msg) => {
   failed = true;
@@ -49,6 +65,7 @@ for (const name of readdirSync(modulesDir).sort()) {
   for (const fn of expect.functions) {
     if (!content.includes(`#${fn}`) && !content.includes(fn)) fail(`${name}: ${fn} is missing from ${expect.xmlFileName}`);
   }
+  console.log(summary(content));
   if (name === "todo") console.log(`\n----- ${expect.xmlFileName} -----\n${content}\n-----\n`);
 }
 

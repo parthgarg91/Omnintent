@@ -2,7 +2,9 @@
 
 Omnintent v0.1 is experimental. Everything below was checked on November 24, 2026, in a Linux
 container with Node.js 22.23, no Swift toolchain, no Android SDK, and Google Maven blocked by the
-network policy.
+network policy. The Swift rows were then checked the same day on a Mac with **Xcode 26.6 (17F113),
+the iOS 26.5 SDK, Swift 6.3.3 and Node.js 24.14**. Xcode 27 and the iOS 27 SDK, which the generated
+code targets, were not installed, so the iOS 27-only parts are still unchecked (see below).
 
 ## Verified by running it
 
@@ -16,7 +18,9 @@ network policy.
 | MCP end to end on workerd | The same 7 tests against `wrangler dev` 4.167.0, which runs the Worker in local workerd | Pass. |
 | Payment rules on MCP | A generated payment server: refuses without elicitation (2026 and 2025 clients); pays after confirmation; strips `sensitive` fields | Pass. |
 | Kotlin | `kotlinc` 2.4.21 (from GitHub releases) compiles the generated code for three manifests, plus handler implementations, against hand-written **stubs** of the AppFunctions and Android APIs (`packages/cli/test/fixtures/kotlin-stubs`) | Compiles. |
-| Swift | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
+| Swift syntax | `tree-sitter-swift` 0.7.1 parses every generated Swift file with no syntax errors (and does flag broken code) | Pass. |
+| Swift types (Xcode 26.6, iOS 26.5 SDK) | `swiftc -typecheck` on the generated code for three manifests (the example with a handler implementation, a payment manifest, and `packages/cli/test/fixtures/swift/coverage.json`, which covers non-`id` ID properties, optional entity parameters, `Int`/`Double`/`Bool`/`Date`/`URL`, arrays, enum arrays, defaults, object results and no-output actions). Swift 6 language mode, complete strict concurrency, warnings as errors; once as is and once with MainActor default isolation plus approachable concurrency. iOS 27-only lines removed first (below) | Pass after one fix (below). |
+| Swift in an app target (Xcode 26.6) | `scripts/xcode-build-check.mjs` (`npm run xcode:check`) builds the same code in a minimal iOS app target with `xcodebuild` for the simulator (Swift 6, MainActor default isolation, warnings as errors), which runs Xcode's App Intents metadata extraction. Every generated intent and entity appears in `Metadata.appintents` | Builds, for all three manifests. |
 | Discovery, deterministic | The example OpenAPI file drafts a valid 6-action manifest whose backend calls equal the hand-written example's; all targets generate from it | Pass. |
 | Discovery, AI path | Against a **fake** Messages API: request shape (URL, headers, `claude-opus-5-5`, `output_config.format`), conversion, the repair loop, giving up on persistent errors, and the CLI writing nothing when the draft stays invalid | Pass. |
 
@@ -30,24 +34,45 @@ The 7 end-to-end checks run on each runtime:
 6. Bad arguments and a backend 404 come back as tool errors, and the backend is unchanged.
 7. A 2025-era client lists and calls tools through the stateless fallback.
 
-Total: 79 tests across 5 files (`npm test`).
+Total: 81 tests across 5 files (`npm test`). The Swift type-check runs only on a Mac with Xcode, and
+the Kotlin compile only when `kotlinc` is present; on the Mac above, 80 ran and the Kotlin compile
+was skipped.
+
+### Bug found by compiling
+
+- Entity and result `displayRepresentation` was generated as a bare string (`"\(name)"`). Swift
+  infers an interpolated literal there as `String`, so it did not compile ("cannot convert return
+  expression of type 'String' to return type 'DisplayRepresentation'"). It is now
+  `DisplayRepresentation(title: "\(name)")`. The example's golden files are updated.
 
 ## Not verified
 
 ### Swift / Siri
 
-- **Never compiled or type-checked.** There was no Swift compiler, Xcode 27 or iOS 27 SDK here. The
-  syntax parse cannot catch type errors, wrong labels or missing conformances.
-- The code follows Apple's documented examples, but these points are unconfirmed:
-  - `@AppIntent(.tool)` on a struct that also declares `: AppIntent` (Apple's own example does this).
-  - `static let authenticationPolicy` on `AppEntity` types (Apple's `BankAccount` example).
+- **Not compiled with Xcode 27 or the iOS 27 SDK.** Only Xcode 26.6 with the iOS 26.5 SDK was
+  available. That SDK does not have these iOS 27 additions, so the checks above removed them before
+  compiling (`forOlderSdk` in `packages/cli/test/swift-sdk.ts`, which changes nothing else):
+  - `@AppIntent(.tool)`. The iOS 26.5 SDK has only `@AppIntent(schema:)`. Whether `.tool` on a struct
+    that also declares `: AppIntent` compiles (Apple's own example does this) is unconfirmed.
+  - `@Property(title:description:)`, `visibility: .internal` and `authenticationPolicy:` on
+    `@Property`. The iOS 26.5 SDK has only `@Property(title:)`.
+- `static let authenticationPolicy` on `AppEntity` types compiles with the iOS 26.5 SDK, but there it
+  is a plain static property that nothing reads (`authenticationPolicy` is only an `AppIntent`
+  requirement in that SDK). Whether iOS 27 reads it, as Apple's `BankAccount` example suggests, is
+  unconfirmed.
+- Confirmed with the iOS 26.5 SDK (and expected to carry over to iOS 27, but not checked there):
   - `TransientAppEntity` result types with `init() {}` and non-optional `@Property` values.
   - `ReturnsValue<[Entity]>`.
-  - Assigning `@Property` values in a memberwise `init` after `self.id`.
+  - Assigning `@Property` values in a memberwise `init` after `self.id`, including a computed `id`
+    when the ID property has another name.
   - `EnumerableEntityQuery` conformance through the handler protocol.
-- Behaviour under Swift 6 strict concurrency and Xcode's MainActor-by-default app setting is
-  unconfirmed. The generated code avoids `nonisolated(unsafe)` and uses `try await` for every
-  handler call, but has not been compiled with either setting.
+  - `requestConfirmation(actionName: .custom(...), dialog:)` and `.pay`.
+  - `@Parameter` defaults for enums, enum arrays, string arrays, numbers and booleans.
+  - Swift 6 strict concurrency, both with and without Xcode's MainActor-by-default setting, with no
+    warnings. The `@AppIntent(.tool)` macro's expansion was not part of this, so it could still add
+    isolation issues on iOS 27.
+- **Never run.** The intents were compiled and their metadata extracted, but not run in a simulator
+  or on a device, and no AppIntentsTesting tests were written.
 - The generated `Skills.skillsbundle/Skills/<name>/SKILL.md` folder mirrors Apple's documented
   layout. Apple says to create the bundle with Xcode's template; whether copying the folder works the
   same way is untested.

@@ -43,7 +43,7 @@ struct ShareListResult: TransientAppEntity {
     var sharedWith: String
 
     var displayRepresentation: DisplayRepresentation {
-        "Share Result"
+        DisplayRepresentation(title: "Share Result")
     }
 
     init() {}

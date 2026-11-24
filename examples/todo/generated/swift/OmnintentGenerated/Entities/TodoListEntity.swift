@@ -19,7 +19,7 @@ struct TodoListEntity: AppEntity {
     var openCount: Int
 
     var displayRepresentation: DisplayRepresentation {
-        "\(name)"
+        DisplayRepresentation(title: "\(name)")
     }
 
     init(id: String, name: String, openCount: Int) {

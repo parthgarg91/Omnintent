@@ -60,7 +60,7 @@ BACKEND_TOKEN=dev ALLOW_UNAUTHENTICATED=true npm run start:node   # or: npm run 
 # MCP endpoint: http://127.0.0.1:8787/mcp
 ```
 
-Run everything (build, type checks, 79 tests including end-to-end MCP on Node and workerd):
+Run everything (build, type checks, 81 tests including end-to-end MCP on Node and workerd):
 
 ```sh
 npm test
@@ -68,6 +68,17 @@ npm test
 
 The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlinc.sh` downloads it
 from GitHub releases into `.tools/`.
+
+On a Mac with Xcode, the tests also type-check the generated Swift with Xcode's Swift compiler and
+iOS SDK. To build it inside a throwaway iOS app target with `xcodebuild` (which also runs Xcode's
+App Intents metadata extraction):
+
+```sh
+npm run xcode:check
+```
+
+With an SDK older than iOS 27, both checks first remove `@AppIntent(.tool)` and the newer
+`@Property` arguments, which only the iOS 27 SDK has. See `docs/LIMITATIONS.md`.
 
 ## Commands
 

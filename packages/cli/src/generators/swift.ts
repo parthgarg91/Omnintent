@@ -324,7 +324,9 @@ function entityFile(name: string, entity: Entity): string {
     "",
     ...block.decls,
     "    var displayRepresentation: DisplayRepresentation {",
-    `        "\\(${swiftIdent(entity.displayProperty)})"`,
+    // A bare "\\(name)" literal is inferred as String and fails to compile; the
+    // title initializer takes a LocalizedStringResource (checked with Xcode 26.6).
+    `        DisplayRepresentation(title: "\\(${swiftIdent(entity.displayProperty)})")`,
     "    }",
     "",
     ...initializer(params, assignments),
@@ -437,7 +439,7 @@ function intentFile(manifest: Manifest, action: Action): string {
       "",
       ...block.decls,
       "    var displayRepresentation: DisplayRepresentation {",
-      `        ${swiftString(title)}`,
+      `        DisplayRepresentation(title: ${swiftString(title)})`,
       "    }",
       "",
       "    init() {}",

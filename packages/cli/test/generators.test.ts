@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -10,6 +10,7 @@ import { generateMcp } from "../src/generators/mcp.js";
 import { generateSwift } from "../src/generators/swift.js";
 import type { Manifest } from "../src/manifest.js";
 import { GENERATED_DIR, REPO, fieldNotesManifest, loadExample, optInManifest, paymentManifest, variant } from "./helpers.js";
+import { IOS_TOOL_SDK_MAJOR, findIosSdk, forOlderSdk, swiftcTypecheckArgs } from "./swift-sdk.js";
 
 const IGNORED = new Set(["node_modules", ".wrangler", ".dev.vars"]);
 
@@ -131,6 +132,61 @@ describe("swift generator", () => {
     const broken = all.filter((f) => parser.parse(f.content).rootNode.hasError).map((f) => f.path);
     expect(broken).toEqual([]);
     expect(parser.parse("struct X { func ( }").rootNode.hasError).toBe(true);
+  });
+
+  const sdk = findIosSdk();
+  it.runIf(!!sdk)(
+    "type-checks with Xcode's Swift compiler and iOS SDK (Swift 6, with and without MainActor default isolation)",
+    () => {
+      const fixtures = resolve(REPO, "packages/cli/test/fixtures/swift");
+      const coverage = JSON.parse(readFileSync(join(fixtures, "coverage.json"), "utf8")) as Manifest;
+      const older = sdk!.major < IOS_TOOL_SDK_MAJOR;
+      if (older) {
+        console.warn(
+          `iOS ${sdk!.version} SDK: type-checking without @AppIntent(.tool), and @Property descriptions, visibility ` +
+            "and policies, which need the iOS 27 SDK",
+        );
+      }
+      const out = mkdtempSync(join(tmpdir(), "omnintent-swift-"));
+      for (const [name, manifest, extra] of [
+        ["todo", loadExample(), [join(fixtures, "TodoExampleHandlers.swift")]],
+        ["coffee", paymentManifest(), []],
+        ["coverage", coverage, []],
+      ] as [string, Manifest, string[]][]) {
+        const sources = generateSwift(manifest)
+          .filter((f) => f.path.endsWith(".swift"))
+          .map((f) => {
+            const path = join(out, name, f.path);
+            mkdirSync(resolve(path, ".."), { recursive: true });
+            writeFileSync(path, older ? forOlderSdk(f.content) : f.content);
+            return path;
+          });
+        for (const mainActor of [false, true]) {
+          try {
+            execFileSync("xcrun", swiftcTypecheckArgs(sdk!, [...sources, ...extra], mainActor), { stdio: "pipe" });
+          } catch (err) {
+            const e = err as { stderr?: Buffer };
+            throw new Error(`${name} (MainActor default: ${mainActor}) failed to type-check:\n${e.stderr?.toString() ?? err}`);
+          }
+        }
+      }
+    },
+    300_000,
+  );
+
+  it("strips only the iOS 27 additions for older SDKs", () => {
+    const item = file(files, "OmnintentGenerated/Entities/TodoItemEntity.swift");
+    const stripped = forOlderSdk(item);
+    expect(stripped).toContain('@Property(title: "Notes")\n    var notes: String?');
+    expect(stripped).toContain("static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication");
+    expect(stripped).toContain('DisplayRepresentation(title: "\\(title)")');
+    const order = file(generateSwift(paymentManifest()), "OmnintentGenerated/Entities/OrderEntity.swift");
+    expect(forOlderSdk(order)).toMatch(/@Property\(title: "[^"]+"\)\n {4}var cardLast4: String\?/);
+    const del = file(files, "OmnintentGenerated/Intents/DeleteItemIntent.swift");
+    const delStripped = forOlderSdk(del);
+    expect(delStripped).not.toContain("@AppIntent(.tool)");
+    expect(delStripped).toContain("static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication");
+    expect(delStripped.split("\n").length).toBe(del.split("\n").length - 1);
   });
 });
 

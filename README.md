@@ -71,7 +71,7 @@ PORT=8787 MCP_SERVER_URL=http://127.0.0.1:8787 BACKEND_OAUTH_CLIENT_ID=todo-mcp 
 The example signs each person in with OAuth 2.1 (SPEC.md section E.5). A backend without its own
 OAuth server can use one shared token instead (section E.4).
 
-Run everything (build, type checks, 190 tests including end-to-end MCP with OAuth sign-in on Node and
+Run everything (build, type checks, 192 tests including end-to-end MCP with OAuth sign-in on Node and
 workerd):
 
 ```sh
@@ -82,6 +82,17 @@ The Kotlin compile check runs when `kotlinc` is available. `scripts/fetch-kotlin
 from GitHub releases into `.tools/`. That check uses stubs; `verify/android` builds the generated Kotlin
 with the real AppFunctions compiler and runs it on an Android emulator (on GitHub Actions, or locally
 with the Android SDK; see its README).
+
+On a Mac with Xcode, the tests also type-check the generated Swift with Xcode's Swift compiler and
+iOS SDK. To build it inside a throwaway iOS app target with `xcodebuild` (which also runs Xcode's
+App Intents metadata extraction):
+
+```sh
+npm run xcode:check
+```
+
+With an SDK older than iOS 27, both checks first remove `@AppIntent(.tool)` and the newer
+`@Property` arguments, which only the iOS 27 SDK has. See `docs/LIMITATIONS.md`.
 
 ## Commands
 

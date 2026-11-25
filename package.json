@@ -14,6 +14,7 @@
     "typecheck": "npm run typecheck -w omnintent && npm run typecheck -w todo-example-mcp",
     "test": "npm run build && npm run typecheck && vitest run",
     "generate:example": "node packages/cli/dist/cli.js generate examples/todo/omnintent.json --target all --out examples/todo/generated",
+    "xcode:check": "npm run build && node scripts/xcode-build-check.mjs examples/todo/omnintent.json packages/cli/test/fixtures/swift/TodoExampleHandlers.swift && node scripts/xcode-build-check.mjs packages/cli/test/fixtures/swift/coverage.json",
     "validate:example": "node packages/cli/dist/cli.js validate examples/todo/omnintent.json"
   },
   "devDependencies": {

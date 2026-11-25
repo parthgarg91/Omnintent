@@ -28,7 +28,7 @@ struct TodoItemEntity: AppEntity {
     var notes: String?
 
     var displayRepresentation: DisplayRepresentation {
-        "\(title)"
+        DisplayRepresentation(title: "\(title)")
     }
 
     init(id: String, listId: String, title: String, done: Bool, dueDate: Date? = nil, notes: String? = nil) {

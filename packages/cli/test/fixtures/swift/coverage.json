@@ -1,0 +1,399 @@
+{
+  "omnintent": "0.1",
+  "app": {
+    "name": "Field Notes",
+    "slug": "field-notes",
+    "description": "Keeps notebooks of field notes and lets the user add, find, tag and archive notes.",
+    "ios": {
+      "bundleId": "com.example.fieldnotes"
+    }
+  },
+  "backend": {
+    "baseUrl": "<YOUR_BACKEND_URL>",
+    "auth": {
+      "type": "bearer",
+      "secret": "BACKEND_TOKEN"
+    }
+  },
+  "entities": {
+    "Notebook": {
+      "type": "object",
+      "title": "Notebook",
+      "description": "A notebook that holds notes.",
+      "privacy": "public",
+      "idProperty": "slug",
+      "displayProperty": "label",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "description": "The notebook's short ID, for example \"birds\"."
+        },
+        "label": {
+          "type": "string",
+          "description": "The notebook's name."
+        },
+        "noteCount": {
+          "type": "integer",
+          "description": "How many notes the notebook holds."
+        },
+        "colour": {
+          "type": "string",
+          "description": "The notebook's colour.",
+          "enum": [
+            "red",
+            "green",
+            "dark-blue"
+          ]
+        },
+        "website": {
+          "type": "string",
+          "format": "uri",
+          "description": "A page about the notebook."
+        }
+      },
+      "required": [
+        "slug",
+        "label",
+        "noteCount"
+      ]
+    },
+    "Note": {
+      "type": "object",
+      "title": "Note",
+      "description": "One field note.",
+      "privacy": "personal",
+      "idProperty": "id",
+      "displayProperty": "headline",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The note ID."
+        },
+        "headline": {
+          "type": "string",
+          "description": "The note's headline."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the note was written."
+        },
+        "rating": {
+          "type": "number",
+          "description": "A score from 0 to 5."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags on the note."
+        },
+        "location": {
+          "type": "string",
+          "description": "Where the note was taken.",
+          "privacy": "sensitive"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Whether the note is pinned."
+        }
+      },
+      "required": [
+        "id",
+        "headline",
+        "createdAt"
+      ]
+    }
+  },
+  "actions": [
+    {
+      "name": "add_note",
+      "title": "Add Note",
+      "description": "Adds a note to a notebook and returns it.",
+      "safety": "write",
+      "authentication": "none",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookSlug": {
+            "type": "string",
+            "description": "The notebook to add to.",
+            "x-omnintent-entity": "Notebook"
+          },
+          "headline": {
+            "type": "string",
+            "description": "The note's headline."
+          },
+          "rating": {
+            "type": "number",
+            "description": "A score from 0 to 5.",
+            "default": 3.5
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many birds were seen."
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "Pin the note.",
+            "default": false
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags to add.",
+            "default": [
+              "field"
+            ]
+          },
+          "moods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "calm",
+                "busy",
+                "very-busy"
+              ]
+            },
+            "description": "Moods.",
+            "default": [
+              "calm"
+            ]
+          },
+          "seenAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was seen."
+          },
+          "link": {
+            "type": "string",
+            "format": "uri",
+            "description": "A related page.",
+            "default": "https://example.com"
+          }
+        },
+        "required": [
+          "notebookSlug",
+          "headline"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$ref": "#/entities/Note"
+      },
+      "backend": {
+        "method": "POST",
+        "path": "/notes"
+      },
+      "examples": [
+        {
+          "utterance": "Add a note about a heron to my birds notebook",
+          "arguments": {
+            "notebookSlug": "birds",
+            "headline": "Heron"
+          }
+        },
+        {
+          "utterance": "Note a robin in birds",
+          "arguments": {
+            "notebookSlug": "birds",
+            "headline": "Robin"
+          }
+        }
+      ]
+    },
+    {
+      "name": "find_notes",
+      "title": "Find Notes",
+      "description": "Finds notes, optionally in one notebook.",
+      "safety": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookSlug": {
+            "type": "string",
+            "description": "The notebook to search.",
+            "x-omnintent-entity": "Notebook"
+          },
+          "query": {
+            "type": "string",
+            "description": "Words to look for."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The most notes to return.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "$ref": "#/entities/Note"
+        }
+      },
+      "backend": {
+        "method": "GET",
+        "path": "/notes"
+      },
+      "examples": [
+        {
+          "utterance": "Find notes about herons",
+          "arguments": {
+            "query": "heron"
+          }
+        },
+        {
+          "utterance": "Show my last five notes",
+          "arguments": {
+            "limit": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "archive_notebook",
+      "title": "Archive Notebook",
+      "description": "Archives a notebook so it is hidden from lists.",
+      "safety": "destructive",
+      "confirmation": {
+        "prompt": "Archive {notebookSlug} and its {keep} newest notes?"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookSlug": {
+            "type": "string",
+            "description": "The notebook to archive.",
+            "x-omnintent-entity": "Notebook"
+          },
+          "keep": {
+            "type": "integer",
+            "description": "How many recent notes stay visible.",
+            "default": 0
+          }
+        },
+        "required": [
+          "notebookSlug"
+        ],
+        "additionalProperties": false
+      },
+      "backend": {
+        "method": "POST",
+        "path": "/notebooks/{notebookSlug}/archive"
+      },
+      "examples": [
+        {
+          "utterance": "Archive my birds notebook",
+          "arguments": {
+            "notebookSlug": "birds"
+          }
+        },
+        {
+          "utterance": "Archive birds but keep three notes",
+          "arguments": {
+            "notebookSlug": "birds",
+            "keep": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "export_notebook",
+      "title": "Export Notebook",
+      "description": "Exports a notebook and returns a download link.",
+      "safety": "write",
+      "confirmation": {
+        "prompt": "Export {notebookSlug} as {format}?",
+        "acceptLabel": "Export"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notebookSlug": {
+            "type": "string",
+            "description": "The notebook to export.",
+            "x-omnintent-entity": "Notebook"
+          },
+          "format": {
+            "type": "string",
+            "description": "File format.",
+            "enum": [
+              "pdf",
+              "csv"
+            ],
+            "default": "pdf"
+          },
+          "since": {
+            "type": "string",
+            "format": "date",
+            "description": "Only notes after this day."
+          }
+        },
+        "required": [
+          "notebookSlug"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "title": "Export",
+        "description": "The finished export.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to download the file."
+          },
+          "bytes": {
+            "type": "integer",
+            "description": "File size in bytes."
+          },
+          "status": {
+            "type": "string",
+            "description": "Export state.",
+            "enum": [
+              "ready",
+              "partial"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Problems found."
+          }
+        },
+        "required": [
+          "url",
+          "status"
+        ]
+      },
+      "backend": {
+        "method": "POST",
+        "path": "/notebooks/{notebookSlug}/export"
+      },
+      "examples": [
+        {
+          "utterance": "Export my birds notebook as CSV",
+          "arguments": {
+            "notebookSlug": "birds",
+            "format": "csv"
+          }
+        },
+        {
+          "utterance": "Export birds",
+          "arguments": {
+            "notebookSlug": "birds"
+          }
+        }
+      ]
+    }
+  ]
+}
